@@ -10,3 +10,4 @@ Imports:
     ggplot2
 License: GPL-3
 LazyData: true
+URL: https://github.com/anthonydn/treateffect

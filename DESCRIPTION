@@ -1,13 +1,14 @@
 Package: treateffect
 Title: Calculates and plots treatment effects from manipulative experiments
-Version: 0.1
+Version: 0.15
 Authors@R: person("Anthony", "Darrouzet-Nardi", email = "anthony@darrouzet-nardi.net",
   role = c("aut", "cre"))
 Description: What the package does (one paragraph)
-Depends: R (>= 3.1.1), dplyr, ggplot2, nlme, contrast, lazyeval
+Depends: dplyr, ggplot2
 Imports:
-    dplyr,
-    ggplot2
+    Hmisc,
+    lazyeval,
+    lattice
 License: GPL-3
 LazyData: true
 URL: https://github.com/anthonydn/treateffect

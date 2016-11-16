@@ -1,3 +1,6 @@
+#make colors repeat
+#implement that sweet Tufte graphics package
+
 #######plotting differences
 plotdiff <- function(x, treatcol = NULL, panel.eq = NULL, dodge = 0,
   x_axis = "time", pscale = FALSE, scales = "free_y", subset = NULL) {

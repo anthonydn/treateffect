@@ -4,7 +4,7 @@ Version: 0.15
 Authors@R: person("Anthony", "Darrouzet-Nardi", email = "anthony@darrouzet-nardi.net",
   role = c("aut", "cre"))
 Description: What the package does (one paragraph)
-Depends: dplyr, ggplot2
+Depends: tidyverse
 Imports:
     Hmisc,
     lazyeval,

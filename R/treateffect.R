@@ -9,7 +9,12 @@
 #broom?
 #graphical alternative to sig stars - maybe text CIs
 #for teaching, learning, tweaking, spit out code for graphs, lme etc
+#custom geom for the gradient CI viz
+#"main effects" or pooling over crossed treatments should be an option. maybe specified in comp_groups as crossed or something
+#bootfrac could be done in a less janky way by figuring out how to use the boot function and potentially something like the BCa method.
+#multiple x variables?
 
+##NOT SURE WHAT'S NEXT. POSSIBLY WORK ON POOLING/BLOCKING/SUBSAMPLING
 
 ## TREATEFFECT FUNCTION
 
@@ -43,10 +48,6 @@ if (!is.null(subsample)) ddf <- ddf %>%
 subset <- eval(substitute(subset), ddf)
 if (!is.null(subset)) ddf <- ddf[subset,]
 
-#just a warning about the importance of ordering treatment variable
-if (class(ddf[[lpf$right.name]])[1] != "ordered")
-  warning("treatment is not an ordered factor.") #this was not triggering when I sent a character vector in as the treatment variable. needs to warn or else you get a cryptic error form the define_comparisons function
-
 #create design list object to keep track of experimental design
 d <- list(response = r, treatment = lpf$right.name,
   times = times, subsample = subsample, pool = pool, block = block)
@@ -60,21 +61,27 @@ d$comp_function <- comp_function
 d$extract <- extract
 #if (length(r) > 1) design$variable <- "variable"
 
+#just a warning about the importance of ordering treatment variable
+if (!is.null(comp_groups) & !is.null(d$levels) &
+    class(ddf[[lpf$right.name]])[1] != "ordered")
+  warning("treatment is not an ordered factor.") #this was not triggering when I sent a character vector in as the treatment variable. needs to warn or else you get a cryptic error from the define_comparisons function
+
 #summaries
 treatment_summaries <- ddf %>%
   group_by_(.dots = lapply(c("variable", d$panel, d$times, d$treatment),
     as.symbol)) %>%
   filter(!is.na(response)) %>%
+  select(-suppressWarnings(one_of(d$block, "n"))) %>% #the problem is that summarise_all does ALL non-grouping columns, which includes block and "n" in the case of a subsample. (may need these at some point we will see)
   summarise_all(c("length", summary_functions)) %>%
-  rename(n = length) #i believe this is problematic. run it on the "subsampled" labile N data
+  rename(n = length)
 
 #comparisons
-if (!is.null(comp_groups)) {
+if (!is.null(comp_groups) & !is.null(d$levels)) {
   d$comparisons <- comp_groups(d) %>% define_comparisons
   d$FUN <- function(x, ...) try(d$comp_function$FUN(x, ...), silent = TRUE)
   if (is.null(d$extract)) d$extract <- d$comp_function$default_extract else
     d$extract <- d$extract
-###########  comparisons <- ddf %>%
+comparisons <- ddf %>%
     group_by_(.dots = lapply(c("variable", d$panel, d$times), as.symbol)) %>%
     do(mod = pergroup(., d = d)) %>%
     expand_tbl_matrix(., d = d) %>%
@@ -166,7 +173,7 @@ allcomps <- function(design)
 #http://www.sumsar.net/blog/2015/07/easy-bayesian-bootstrap-in-r/
 
 welchCI = list(
-  FUN = function(data, d = d) t.test(d$basic_formula, 
+  FUN = function(data, d = d) t.test(d$basic_formula,
     data, conf.level = d$conf.int),
   default_extract = alist(meandiff = estimate[2] - estimate[1],
     CIlo = -conf.int[2], CIhi = -conf.int[1]))
@@ -181,6 +188,17 @@ bootfrac <- list(FUN = function(data, d = d) {
     lo = quantile(trt/con, (1-d$conf.int)/2 ,na.rm=T),
     hi = quantile(trt/con, 1-(1-d$conf.int)/2 ,na.rm=T))},
   default_extract = alist(fracdiff = fracdiff, fracdiff_lo = lo, fracdiff_hi = hi))
+
+bootperc <- list(FUN = function(data, d = d) {
+  l <- levels(data[[d$treatment]])
+  groupA <- data$response[data[[d$treatment]] == l[1]] %>% na.omit
+  groupB <- data$response[data[[d$treatment]] == l[2]] %>% na.omit
+  con <- attr(Hmisc::smean.cl.boot(groupA, B=2000, reps=TRUE), "reps")
+  trt <- attr(Hmisc::smean.cl.boot(groupB, B=2000, reps=TRUE), "reps")
+  list(percdiff = (mean(groupB) - mean(groupA)) / mean(groupA) * 100,
+       lo = quantile((trt - con)/con * 100, (1-d$conf.int)/2 ,na.rm=T),
+       hi = quantile((trt - con)/con * 100, 1-(1-d$conf.int)/2 ,na.rm=T))},
+  default_extract = alist(percdiff = percdiff, percdiff_lo = lo, percdiff_hi = hi))
 
 bootdiff <- list(FUN = function(data, d = d) {
   l <- levels(data[[d$treatment]])

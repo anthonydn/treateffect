@@ -12,7 +12,6 @@
 #custom geom for the gradient CI viz
 #"main effects" or pooling over crossed treatments should be an option. maybe specified in comp_groups as crossed or something
 #bootfrac could be done in a less janky way by figuring out how to use the boot function and potentially something like the BCa method.
-#multiple x variables?
 
 ##NOT SURE WHAT'S NEXT. POSSIBLY WORK ON POOLING/BLOCKING/SUBSAMPLING
 
@@ -25,67 +24,74 @@ treateffect <- function(data, formula, control = NULL,
 
 #formula parsing and data frame construction
 lpf <- lattice:::latticeParseFormula(formula, data, multiple = TRUE)
-if ("groups" %in% names(lpf)) r <- levels(lpf$groups) else r <- lpf$left.name
+re <- unlist(strsplit(lpf$left.name, ' [+] '))
+tr <- unlist(strsplit(lpf$right.name, ' [+] '))
+
+N = length(lpf$left) / length(tr) / length(re)
 ddl <- list()
-if (length(r) == 1) ddl$variable <- rep(r, dim(data)[1])
-if (length(r)>1) ddl$variable <- lpf$groups
+ddl$y_variable <- rep(re, length(tr), ea = N)
+ddl$x_variable <- rep(tr, ea = N * length(re))
 if (!is.null(lpf$condition)) ddl <- c(ddl, lapply(lpf$condition, as.factor))
-if (!is.null(times)) ddl[[times]] <- rep(data[[times]], length(r))
-if (!is.null(pool)) ddl[[pool]] <- rep(data[[pool]], length(r))
-if (!is.null(block)) ddl[[block]] <- rep(data[[block]], length(r))
-ddl[[lpf$right.name]] <- lpf$right
+if (!is.null(times)) ddl[[times]] <- rep(data[[times]], length(re) * length(tr))
+if (!is.null(pool)) ddl[[pool]] <- rep(data[[pool]], length(re) * length(tr))
+if (!is.null(block)) ddl[[block]] <- rep(data[[block]], length(re) * length(tr))
+ddl$treatment <- if(!is.factor(lpf$right)) factor(lpf$right) else lpf$right
 ddl$response <- lpf$left
 ddf <- lapply(ddl, data.frame) %>% bind_cols
 names(ddf) <- names(ddl)
 
 #averaging across subsamples
-#(this is tricky and requires some more conceptual thinking about how to do it right)
 if (!is.null(subsample)) ddf <- ddf %>%
   group_by_(.dots = setdiff(names(ddf), c("response"))) %>%
   summarise(n = n(), response = mean(response, na.rm = T))
 
-#parsing the subset argument
+#subsetting
 subset <- eval(substitute(subset), ddf)
 if (!is.null(subset)) ddf <- ddf[subset,]
 
 #create design list object to keep track of experimental design
-d <- list(response = r, treatment = lpf$right.name,
+d <- list(response = re, treatment = tr,
   times = times, subsample = subsample, pool = pool, block = block)
 if (!is.null(lpf$condition)) d$panel <- names(lpf$condition)
-d$levels <- levels(lpf$right)
-if (is.null(control)) d$control <- levels(lpf$right)[1] else
- d$control <- control
-d$basic_formula <- formula(paste("response ~ ", d$treatment))
+d$levels <- lapply(tr, function(x) levels(factor(data[[x]])))
+names(d$levels) <- tr
+if (is.null(control)) d$control <- lapply(d$levels, `[[`, 1) else
+  d$control <- control
 d$conf.int <- conf.int
 d$comp_function <- comp_function
 d$extract <- extract
-#if (length(r) > 1) design$variable <- "variable"
 
-#just a warning about the importance of ordering treatment variable
+#warning about the importance of ordering treatment variable
 if (!is.null(comp_groups) & !is.null(d$levels) &
     class(ddf[[lpf$right.name]])[1] != "ordered")
   warning("treatment is not an ordered factor.") #this was not triggering when I sent a character vector in as the treatment variable. needs to warn or else you get a cryptic error from the define_comparisons function
 
 #summaries
 treatment_summaries <- ddf %>%
-  group_by_(.dots = lapply(c("variable", d$panel, d$times, d$treatment),
+  group_by_(.dots = lapply(c("y_variable", "x_variable", d$panel, d$times, "treatment"),
     as.symbol)) %>%
   filter(!is.na(response)) %>%
   select(-suppressWarnings(one_of(d$block, "n"))) %>% #the problem is that summarise_all does ALL non-grouping columns, which includes block and "n" in the case of a subsample. (may need these at some point we will see)
-  summarise_all(c("length", summary_functions)) %>%
+  summarise_all(c("length", summary_functions)) %>% #this doesn't like illegal grouping variable names (ie backticked), which happens as well if you try to specify multiple x's
   rename(n = length)
 
 #comparisons
 if (!is.null(comp_groups) & !is.null(d$levels)) {
-  d$comparisons <- comp_groups(d) %>% define_comparisons
-  d$FUN <- function(x, ...) try(d$comp_function$FUN(x, ...), silent = TRUE)
-  if (is.null(d$extract)) d$extract <- d$comp_function$default_extract else
-    d$extract <- d$extract
-comparisons <- ddf %>%
-    group_by_(.dots = lapply(c("variable", d$panel, d$times), as.symbol)) %>%
-    do(mod = pergroup(., d = d)) %>%
-    expand_tbl_matrix(., d = d) %>%
-    uldf
+
+d$comparisons <-
+  lapply(tr, function(x) define_comparisons(comp_groups(d$levels[[x]],
+    d$control[[x]]))) %>% unlist(., recursive = FALSE)
+d$FUN <- function(x, ...) try(d$comp_function$FUN(x, ...), silent = TRUE)
+if (is.null(d$extract)) d$extract <- d$comp_function$default_extract else
+  d$extract <- d$extract
+comparisons <-
+  ddf %>%
+  group_by_(.dots = lapply(c("y_variable", d$panel, d$times), as.symbol)) %>% #note: if you have the same treatment names in multiple x variables it will fuck up
+  do(mod = pergroup(., comparisons = d$comparisons, FUN = d$FUN,
+    extract = d$extract, conf.int = d$conf.int)) %>%
+  expand_tbl_matrix(., comparisons = d$comparisons) %>%
+  uldf
+
 } else comparisons <- NULL
 #option for multiple comparison functions
 
@@ -106,25 +112,25 @@ print.te <- function(x) {
 
 ##PERGROUP FUNCTIONS
 
-pergroup <- function(x, d) {
-  m <- lapply(d$comparisons, filter_treatments, data = x, d = d) %>%
-    lapply(d$FUN, d = d)
-  do.call(sapply, c(list(m), extract_stats, d$extract)) %>%
+#comparisons,
+pergroup <- function(data, comparisons, FUN, extract, conf.int) {
+  m <- lapply(comparisons, filter_treatments, data = data) %>% lapply(FUN, conf.int = conf.int)
+  do.call(sapply, c(list(m), extract_stats, extract)) %>%
   t}
 
-filter_treatments <- function(data, d = d, comparisons) data %>%
+filter_treatments <- function(data, comparisons) data %>%
   filter_(lazyeval::interp(~(t == comparisons$groupA | t == comparisons$groupB),
-    t = as.name(d$treatment))) %>% droplevels
+    t = as.name("treatment"))) %>% droplevels
 
 extract_stats <- function(x, ...) #broom may help here
   eval(substitute(alist(...))) %>% lapply(function(y)
     tryCatch(with(x, eval(y)), error = function(e) NA))
 
-expand_tbl_matrix <- function(x, d = d) {
+expand_tbl_matrix <- function(x, comparisons) {
   #the name mod comes from the do function
-  comps <- do.call(rbind,x$mod)
+  comps <- do.call(rbind, x$mod)
   comps <- suppressWarnings(data.frame(comparison = ordered(row.names(comps),
-    levels = names(d$comparisons)), comps))
+    levels = names(comparisons)), comps))
   groups <- select(x, -mod) %>% data.frame
   groupsrep <- groups[rep(row.names(groups), ea = dim(x$mod[[1]])[1]),TRUE, drop = FALSE] #causes failure w small data frames, possibly due to one group but maybe not
   cbind(groupsrep, comps)
@@ -160,53 +166,52 @@ define_comparisons <- function(groups) {
     paste(groupB[x], "-", groupA[x])) %>% as.character
   nn}
 
-mcc <- function(design)
-  list(groupA = rep(design$control, length(design$levels)-1),
-  groupB = setdiff(design$levels,design$control))
+mcc <- function(levels, control)
+  list(groupA = rep(control, length(levels)-1),
+  groupB = setdiff(levels, control))
 
-allcomps <- function(design)
-  list(groupA = combn(design$levels, 2)[1,],
-       groupB = combn(design$levels, 2)[2,])
+allcomps <- function(levels, control)
+  list(groupA = combn(levels, 2)[1,],
+       groupB = combn(levels, 2)[2,])
 
-##SPECIFIC FUNCTIONS FOR DOING THE ACTUAL COMPARISONS (t-test vs. bootstrap vs. bayes vs. lme etc)
+##SPECIFIC FUNCTIONS FOR DOING COMPARISONS (t-test vs. bootstrap vs. bayes vs. lme etc)
 
 #http://www.sumsar.net/blog/2015/07/easy-bayesian-bootstrap-in-r/
 
 welchCI = list(
-  FUN = function(data, d = d) t.test(d$basic_formula,
-    data, conf.level = d$conf.int),
+  FUN = function(data, conf.int) t.test(response ~ treatment, data, conf.level = conf.int),
   default_extract = alist(meandiff = estimate[2] - estimate[1],
     CIlo = -conf.int[2], CIhi = -conf.int[1]))
 
-bootfrac <- list(FUN = function(data, d = d) {
-  l <- levels(data[[d$treatment]])
-  groupA <- data$response[data[[d$treatment]] == l[1]] %>% na.omit
-  groupB <- data$response[data[[d$treatment]] == l[2]] %>% na.omit
+bootfrac <- list(FUN = function(data, conf.int) {
+  l <- levels(data$treatment)
+  groupA <- data$response[data$treatment == l[1]] %>% na.omit
+  groupB <- data$response[data$treatment == l[2]] %>% na.omit
   con <- attr(Hmisc::smean.cl.boot(groupA, B=2000, reps=TRUE), "reps")
   trt <- attr(Hmisc::smean.cl.boot(groupB, B=2000, reps=TRUE), "reps")
   list(fracdiff = mean(groupB)/mean(groupA),
-    lo = quantile(trt/con, (1-d$conf.int)/2 ,na.rm=T),
-    hi = quantile(trt/con, 1-(1-d$conf.int)/2 ,na.rm=T))},
+    lo = quantile(trt/con, (1-conf.int)/2 ,na.rm=T),
+    hi = quantile(trt/con, 1-(1-conf.int)/2 ,na.rm=T))},
   default_extract = alist(fracdiff = fracdiff, fracdiff_lo = lo, fracdiff_hi = hi))
 
-bootperc <- list(FUN = function(data, d = d) {
-  l <- levels(data[[d$treatment]])
-  groupA <- data$response[data[[d$treatment]] == l[1]] %>% na.omit
-  groupB <- data$response[data[[d$treatment]] == l[2]] %>% na.omit
+bootperc <- list(FUN = function(data, conf.int) {
+  l <- levels(data$treatment)
+  groupA <- data$response[data$treatment == l[1]] %>% na.omit
+  groupB <- data$response[data$treatment == l[2]] %>% na.omit
   con <- attr(Hmisc::smean.cl.boot(groupA, B=2000, reps=TRUE), "reps")
   trt <- attr(Hmisc::smean.cl.boot(groupB, B=2000, reps=TRUE), "reps")
   list(percdiff = (mean(groupB) - mean(groupA)) / mean(groupA) * 100,
-       lo = quantile((trt - con)/con * 100, (1-d$conf.int)/2 ,na.rm=T),
-       hi = quantile((trt - con)/con * 100, 1-(1-d$conf.int)/2 ,na.rm=T))},
+       lo = quantile((trt - con)/con * 100, (1-conf.int)/2 ,na.rm=T),
+       hi = quantile((trt - con)/con * 100, 1-(1-conf.int)/2 ,na.rm=T))},
   default_extract = alist(percdiff = percdiff, percdiff_lo = lo, percdiff_hi = hi))
 
-bootdiff <- list(FUN = function(data, d = d) {
-  l <- levels(data[[d$treatment]])
-  groupA <- data$response[data[[d$treatment]] == l[1]] %>% na.omit
-  groupB <- data$response[data[[d$treatment]] == l[2]] %>% na.omit
+bootdiff <- list(FUN = function(data, conf.int) {
+  l <- levels(data$treatment)
+  groupA <- data$response[data$treatment == l[1]] %>% na.omit
+  groupB <- data$response[data$treatment == l[2]] %>% na.omit
   con <- attr(Hmisc::smean.cl.boot(groupA, B=2000, reps=TRUE), "reps")
   trt <- attr(Hmisc::smean.cl.boot(groupB, B=2000, reps=TRUE), "reps")
   list(bootdiff = mean(groupB) - mean(groupA),
-    lo = quantile(trt - con, (1 - d$conf.int) / 2 , na.rm = T),
-    hi = quantile(trt - con, 1 - (1 - d$conf.int) / 2 , na.rm = T))},
+    lo = quantile(trt - con, (1 - conf.int) / 2 , na.rm = T),
+    hi = quantile(trt - con, 1 - (1 - conf.int) / 2 , na.rm = T))},
   default_extract = alist(meandiff = bootdiff, bootdiff_lo = lo, bootdiff_hi = hi))

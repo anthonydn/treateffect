@@ -36,7 +36,7 @@ gg <- ggplot(data = x2) +
   scale_color_manual(values = treatcol)
 
 if (x_axis == "time") {
-  if (is.null(panel.eq)) panel.eq <- panel.default(c("variable", d$panel))
+  if (is.null(panel.eq)) panel.eq <- panel.default(c("y_variable", "x_variable", d$panel))
   gg <- gg +
     geom_line(aes_string(d$times, "center", col = "comparison"),
 	    position = pd, lwd = 1) +
@@ -47,9 +47,9 @@ if (x_axis == "time") {
 
 if (x_axis == "treatment") {
   if (is.null(panel.eq) & is.null(d$times))
-    panel.eq <- panel.default(c("variable", d$panel))
+    panel.eq <- panel.default(c("y_variable", "x_variable", d$panel))
   if (is.null(panel.eq) &! is.null(d$times))
-    panel.eq <- panel.default(c("variable", d$panel, d$times))
+    panel.eq <- panel.default(c("y_variable", "x_variable", d$panel, d$times))
   gg <- gg + geom_pointrange(aes_string("comparison", "center",
     ymax = "hi", ymin = "lo", col = "comparison"), lwd = 1) +
   geom_hline(yintercept = c(0), col = "gray")

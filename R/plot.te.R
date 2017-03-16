@@ -11,7 +11,7 @@ if (!is.null(subset)) x2 <- x2[subset,]
 
 d <- x$design
 if (is.null(d$times)) x_axis <- "treatment"
-if (is.null(treatcol)) treatcol <- treatcol.default(length(d$levels))
+if (is.null(treatcol)) treatcol <- treatcol.default(length(x2$treatment))
 pd <- position_dodge(dodge)
 
 x2$cen <- x2[[cen]]
@@ -26,32 +26,32 @@ gg <- ggplot(data = x2) +
   scale_color_manual(values = treatcol)
 
 if (x_axis == "time") {
-  if (is.null(panel.eq)) panel.eq <- panel.default(c("variable", d$panel))
-  gg <- gg + geom_line(aes_string(d$times, "cen", col = d$treatment),
+  if (is.null(panel.eq)) panel.eq <- panel.default(c("y_variable", "x_variable", d$panel))
+  gg <- gg + geom_line(aes_string(d$times, "cen", col = "treatment"),
       position = pd, lwd = 1) +
     geom_linerange(aes_string(d$times, "cen", ymax = "hi",
-	  ymin = "lo", col = d$treatment), position = pd, lwd = 1)
+	  ymin = "lo", col = "treatment"), position = pd, lwd = 1)
   if (points) gg <- gg + geom_point(aes_string(d$times, "response",
-    col = d$treatment), data = x$data, position = pd)
+    col = "treatment"), data = x$data, position = pd)
 	#add if flag and ribbons
   }
 
 if (x_axis == "treatment") {
   if (is.null(panel.eq) & is.null(d$times))
-    panel.eq <- panel.default(c("variable", d$panel))
+    panel.eq <- panel.default(c("y_variable", "x_variable", d$panel))
   if (is.null(panel.eq)&!is.null(d$times))
-    panel.eq <- panel.default(c("variable", d$panel,"times"))
+    panel.eq <- panel.default(c("y_variable", "x_variable", d$panel, "times"))
   if (bars == "box") gg <- gg +
-    geom_boxplot(aes_string(d$treatment,"response", col = d$treatment),
+    geom_boxplot(aes_string("treatment", "response", col = "treatment"),
 	  data = x$data) else
-    gg <- gg + geom_linerange(aes_string(d$treatment, "cen", ymax = "hi",
-    ymin = "lo", col = d$treatment), position = pd, lwd = 1)
-  if (points) gg <- gg + geom_point(aes_string(d$treatment, "response",
-    col = d$treatment), data = x$data, position = pd)
-  x2$gs1 <- as.numeric(x2[[d$treatment]]) - 0.3
-  x2$gs2 <- as.numeric(x2[[d$treatment]]) + 0.3
+    gg <- gg + geom_linerange(aes_string("treatment", "cen", ymax = "hi",
+    ymin = "lo", col = "treatment"), position = pd, lwd = 1)
+  if (points) gg <- gg + geom_point(aes_string("treatment", "response",
+    col = "treatment"), data = x$data, position = pd)
+  x2$gs1 <- as.numeric(x2$treatment) - 0.3
+  x2$gs2 <- as.numeric(x2$treatment) + 0.3
   gg <- gg + geom_segment(aes_string("gs1", "cen", yend = "cen", xend = "gs2",
-	col = d$treatment), data = x2, lwd = 1)
+	col = "treatment"), data = x2, lwd = 1)
 	}
 
 if (!is.null(panel.eq)) gg <- gg + facet_grid(panel.eq, scales = scales)

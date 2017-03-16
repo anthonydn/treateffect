@@ -21,7 +21,15 @@ compex_fracdiff <- function(x, ..., cen = "fracdiff", lo = "fracdiff_lo",
     filter_(.dots = lazyeval::lazy_dots(...))
   paste0(round(ex[cen] * factor, digits = digits),
     units, " [", round(ex[lo] * factor, digits = digits),", ",
-    round(ex[hi] * factor, digits = digits), "]")
-}
+    round(ex[hi] * factor, digits = digits), "]")}
+
+compex_bootdiff <- function(x, ..., cen = "meandiff", lo = "bootdiff_lo",
+    hi = "bootdiff_hi", digits = 2, units = "", factor = 1) {
+  ex <- x$comparisons %>%
+    filter_(.dots = lazyeval::lazy_dots(...))
+  paste0(round(ex[cen] * factor, digits = digits),
+    units, " [", round(ex[lo] * factor, digits = digits),", ",
+    round(ex[hi] * factor, digits = digits), "]")}
+
 
 #n.te %>% compex_fracdiff(variable == "labile", tussock == "T", comparison == "A.N - C.N", doy == 148, digits = 0)

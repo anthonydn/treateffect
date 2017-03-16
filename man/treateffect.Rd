@@ -1,9 +1,9 @@
 \name{treateffect}
 \alias{treateffect-package}
 \alias{treateffect}
-\title{Quantify effect sizes in experiments with multiple treatments}
+\title{Quantify treatment effect sizes in structured experiments}
 \description{
-Using a standardized formula interface and human-understandable data variable types such as response, treatment, time, and block, this function organizes data and performs a "many t-tests" type approach in which each specific contrast is evaluated at the most basic level in lieu of a complex omnibus model.
+Organize data and perform a "many t-tests" type analysis in which effect sizes are independently calculated for each specficic contrast in lieu of a complex omnibus model. Inputs use a formula interface and human-understandable data variable types such as responses, treatments, time, and block.
 }
 \usage{
 hotspots(data, formula, control = NULL,
@@ -16,16 +16,16 @@ hotspots(data, formula, control = NULL,
 a data frame or tibble
 }
  \item{formula}{
-The formula is specified as y1 + y2 + ... ~ x | g1 + g2 + .... where y1...ym are response variables 1-m (should be numeric), x is the categorical response variable (a single ordered factor; use interaction() to create a single variable if you have multiple treatments). g1...gm are grouping variables 1-g (factors or character vectors) by which data will be split before analysis, also appearing on separate panels during graphing. This formula interface is similar to the lattice formula interface and in fact uses the lattice formula parser.
+The formula is specified as \code{y1 + y2 + ... ~ x | g1 + g2 + ...} where \code{y1...ym} are response variables \code{1...m} (should be numeric), \code{x} is the categorical response variable (a single ordered factor; use \code{interaction()} to create a single variable if you have multiple treatments). \code{g1...gm} are grouping variables \code{1...g} (factors or character vectors) by which data will be split before analysis, also appearing on separate panels during graphing. This formula interface is similar to the lattice formula interface and in fact uses the lattice formula parser. On-the-fly transformations and other manipulations can be used.
 }
  \item{control}{
-an optional character string indicating which treatment level is the "control" if comparisons with the control are desired. Comparisons of each treatment using the mcc() function are the default. If nothing is specified, the first level in the treatment object (hopefully an ordered factor) is used.
+an optional character string indicating which treatment level is the "control" if comparisons with the control are desired. Comparisons of each treatment using the \code{mcc()} function are the default. If nothing is specified, the first level in the treatment vector (preferably an ordered factor) is used.
 }
  \item{times}{
 an optional character string indicating the name of a time variable (which can be numeric or of any of the typical date and time formats). Only one time variable can be specified.
 }
  \item{subsample}{
-an optional character string indicating the names of variables over which averages should be made. The \code{mean()} function is used for averaging. To average using another function or technique, do it beforehand.
+an optional character string indicating the names of variables over which subsamples should be averaged. The \code{mean()} function is used for averaging.
 }
  \item{pool}{
 not implemented but will eventually allow the pooling of variance over certain variables (e.g. time) for some analyses
@@ -46,7 +46,7 @@ a function that will be used to make the specific comparisons. Currently availab
 a list describing which components of the output of \code{comp_function} to extract. Each \code{comp_function} includes a default list.
 }
  \item{conf.int}{
-The alpha level for all confidence interval calculations.
+The alpha level for confidence interval calculations.
 }
  \item{subset}{
 an optional logical vector indicating a subset of the data to use.

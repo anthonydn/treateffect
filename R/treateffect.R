@@ -15,19 +15,18 @@
 
 ##NOT SURE WHAT'S NEXT. POSSIBLY WORK ON POOLING/BLOCKING/SUBSAMPLING
 
-## TREATEFFECT FUNCTION
+#FORMULA PARSING INTO DATA FRAME AND DESIGN LIST
+teParseFormula <- function(data, formula, times = NULL, pool = NULL, block = NULL,
+  subsample = NULL, subset = NULL, summary_functions = c("mean", "se", "CI68"),
+  comp_groups = mcc, control = NULL, comp_function = welchCI,
+  extract = NULL, conf.int = 0.95) {
 
-treateffect <- function(data, formula, control = NULL,
-  times = NULL, subsample = NULL, pool = NULL, block = NULL,
-  summary_functions = c("mean", "se", "CI68"), comp_groups = mcc, comp_function = welchCI,
-  extract = NULL, conf.int = 0.95, subset = NULL) {
-
-#formula parsing and data frame construction
+#create a data frame with a standardized form
 lpf <- lattice:::latticeParseFormula(formula, data, multiple = TRUE)
 re <- unlist(strsplit(lpf$left.name, ' [+] '))
 tr <- unlist(strsplit(lpf$right.name, ' [+] '))
-
 N = length(lpf$left) / length(tr) / length(re)
+
 ddl <- list()
 ddl$y_variable <- rep(re, length(tr), ea = N)
 ddl$x_variable <- rep(tr, ea = N * length(re))
@@ -39,76 +38,89 @@ ddl$treatment <- if(!is.factor(lpf$right)) factor(lpf$right) else lpf$right
 ddl$response <- lpf$left
 ddf <- lapply(ddl, data.frame) %>% bind_cols
 names(ddf) <- names(ddl)
-
-#averaging across subsamples
+#averaging across subsamples (not sure this works as intended in all cases)
 if (!is.null(subsample)) ddf <- ddf %>%
   group_by_(.dots = setdiff(names(ddf), c("response"))) %>%
   summarise(n = n(), response = mean(response, na.rm = T))
-
 #subsetting
-subset <- eval(substitute(subset), ddf)
+subset <- eval(subset, ddf)
 if (!is.null(subset)) ddf <- ddf[subset,]
 
-#create design list object to keep track of experimental design
-d <- list(response = re, treatment = tr,
-  times = times, subsample = subsample, pool = pool, block = block)
+#create design list object defining the experimental design
+d <- list(response = re, treatment = tr, times = times, subsample = subsample,
+  pool = pool, block = block)
 if (!is.null(lpf$condition)) d$panel <- names(lpf$condition)
 d$levels <- lapply(tr, function(x) levels(factor(data[[x]])))
 names(d$levels) <- tr
 if (is.null(control)) d$control <- lapply(d$levels, `[[`, 1) else
   d$control <- control
-d$conf.int <- conf.int
+d$summary_functions <- summary_functions
 d$comp_function <- comp_function
 d$extract <- extract
+if (!is.null(comp_groups) & !is.null(d$levels)) {
+  d$comparisons <-
+    lapply(tr, function(x) define_comparisons(comp_groups(d$levels[[x]],
+      d$control[[x]]))) %>% unlist(., recursive = FALSE)
+  d$FUN <- function(x, ...) try(d$comp_function$FUN(x, ...), silent = TRUE)
+  if (is.null(d$extract)) d$extract <- d$comp_function$default_extract else
+    d$extract <- d$extract
+  d$conf.int <- conf.int
+} else comparisons <- NULL
 
 #warning about the importance of ordering treatment variable
 if (!is.null(comp_groups) & !is.null(d$levels) &
     class(ddf[[lpf$right.name]])[1] != "ordered")
-  warning("treatment is not an ordered factor.") #this was not triggering when I sent a character vector in as the treatment variable. needs to warn or else you get a cryptic error from the define_comparisons function
+  warning("treatment is not an ordered factor.")
 
-#summaries
-treatment_summaries <- ddf %>%
-  group_by_(.dots = lapply(c("y_variable", "x_variable", d$panel, d$times, "treatment"),
-    as.symbol)) %>%
+list(data = tbl_df(ddf), design = d)
+}
+
+#TREATMENT SUMMARIES
+treatment_summaries <- function(data, design) data %>%
+  group_by_(.dots = lapply(c("y_variable", "x_variable", design$panel,
+    design$times, "treatment"), as.symbol)) %>%
   filter(!is.na(response)) %>%
-  select(-suppressWarnings(one_of(d$block, "n"))) %>% #the problem is that summarise_all does ALL non-grouping columns, which includes block and "n" in the case of a subsample. (may need these at some point we will see)
-  summarise_all(c("length", summary_functions)) %>% #this doesn't like illegal grouping variable names (ie backticked), which happens as well if you try to specify multiple x's
+  select(-suppressWarnings(one_of(design$block, "n"))) %>% #the problem is that summarise_all does ALL non-grouping columns, which includes block and "n" in the case of a subsample. (may need these at some point we will see)
+  summarise_all(c("length", design$summary_functions)) %>% #this doesn't like illegal grouping variable names (ie backticked)
   rename(n = length)
 
-#comparisons
-if (!is.null(comp_groups) & !is.null(d$levels)) {
-
-d$comparisons <-
-  lapply(tr, function(x) define_comparisons(comp_groups(d$levels[[x]],
-    d$control[[x]]))) %>% unlist(., recursive = FALSE)
-d$FUN <- function(x, ...) try(d$comp_function$FUN(x, ...), silent = TRUE)
-if (is.null(d$extract)) d$extract <- d$comp_function$default_extract else
-  d$extract <- d$extract
-comparisons <-
-  ddf %>%
-  group_by_(.dots = lapply(c("y_variable", d$panel, d$times), as.symbol)) %>% #note: if you have the same treatment names in multiple x variables it will fuck up
-  do(mod = pergroup(., comparisons = d$comparisons, FUN = d$FUN,
-    extract = d$extract, conf.int = d$conf.int)) %>%
-  expand_tbl_matrix(., comparisons = d$comparisons) %>%
+#TREATMENT COMPARISONS
+treatment_comparisons <- function(data, design) data %>%
+  group_by_(.dots = lapply(c("y_variable", design$panel, design$times), as.symbol)) %>% #note: if you have the same treatment names in multiple x variables it will fuck up
+  do(mod = pergroup(., comparisons = design$comparisons, FUN = design$FUN,
+    extract = design$extract, conf.int = design$conf.int)) %>%
+  expand_tbl_matrix(., comparisons = design$comparisons) %>%
   uldf
 
-} else comparisons <- NULL
-#option for multiple comparison functions
+## TREATEFFECT FUNCTION (ties the room together does it not?)
+treateffect <- function(data, formula, times = NULL, pool = NULL, block = NULL,
+  subsample = NULL, subset = NULL, summary_functions = c("mean", "se", "CI68"),
+  comp_groups = mcc, control = NULL, comp_function = welchCI,
+  extract = NULL, conf.int = 0.95) {
 
-#output
-output <- list(source_data = data, design = d, data = tbl_df(ddf),
-  treatment_summaries = treatment_summaries, comparisons = comparisons)
+ddf <- teParseFormula(data, formula, times, pool, block, subsample, substitute(subset),
+  summary_functions, comp_groups, control, comp_function, extract, conf.int)
+summaries <- treatment_summaries(ddf$data, ddf$design)
+if (!is.null(ddf$design$comparisons)) comparisons <-
+  treatment_comparisons(ddf$data, ddf$design) else compare <- NULL
+
+output <- list(source_data = data, design = ddf$design, data = ddf$data,
+  treatment_summaries = summaries, comparisons = comparisons)
 class(output) <- "te"
 output
 }
 
+#print te objects
 print.te <- function(x) {
   cat(paste("Response variable(s):", x$design$response), "\n\n")
   cat("Treatment summaries:", "\n")
   try(print(x$treatment_summaries), silent = TRUE)
-  cat("\n\n", "Treatment comparisons:", "\n", sep = '')
-  try(print(x$comparisons), silent = TRUE)
-}
+  if(!is.null(x$design$comparisons)) {
+    cat("\n\n", "Treatment comparisons:", "\n", sep = '')
+    try(print(x$comparisons), silent = TRUE)}}
+
+
+
 
 ##PERGROUP FUNCTIONS
 

@@ -26,7 +26,7 @@ gg <- ggplot(data = x2) +
   scale_color_manual(values = treatcol)
 
 if (x_axis == "time") {
-  if (is.null(panel.eq)) panel.eq <- panel.default(c("y_variable", "x_variable", d$panel))
+  if (is.null(panel.eq)) panel.eq <- panel.default(c("y_variable", d$panel))
   gg <- gg + geom_line(aes_string(d$times, "cen", col = "treatment"),
       position = pd, lwd = 1) +
     geom_linerange(aes_string(d$times, "cen", ymax = "hi",
@@ -38,9 +38,9 @@ if (x_axis == "time") {
 
 if (x_axis == "treatment") {
   if (is.null(panel.eq) & is.null(d$times))
-    panel.eq <- panel.default(c("y_variable", "x_variable", d$panel))
+    panel.eq <- panel.default(c("y_variable", d$panel))
   if (is.null(panel.eq)&!is.null(d$times))
-    panel.eq <- panel.default(c("y_variable", "x_variable", d$panel, "times"))
+    panel.eq <- panel.default(c("y_variable", d$panel, "times"))
   if (bars == "box") gg <- gg +
     geom_boxplot(aes_string("treatment", "response", col = "treatment"),
 	  data = x$data) else

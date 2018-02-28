@@ -1,10 +1,10 @@
 splitAt <- function(x, pos) unname(split(x, cumsum(seq_along(x) %in% pos)))
 
 tedatasim <- function(n, na = 0, response = 1,
-  time = 1, groups = 1, levels = 1, subsample = 1, block = FALSE) {
+  time = 1, groups = 1, levels = 2, subsample = 1, block = FALSE) {
 
   resp_var = matrix(rnorm(n * response * prod(groups) * prod(levels)
-    * time * subsample) + 10, ncol = response) %>% data.frame
+    * time * subsample), ncol = response) %>% data.frame
   colnames(resp_var) <- paste0(rep("resp_var", response), 1:response)
 
   code_num <- c(levels, groups)
@@ -27,12 +27,22 @@ tedatasim <- function(n, na = 0, response = 1,
       times = prod(groups) * time * prod(levels) * n)) else subsample_var = NULL
 
   if(block)
-    block_var = data.frame(block_var = rep(letters[15:(n+14)],
+    block_var = data.frame(block_var = rep(letters[10:(n+9)],
       times = time * prod(levels) * prod(groups),
       ea = subsample)) else
       block_var = NULL
 
   k <- eval(lapply(as.list(c("units", "sample_var", "subsample_var", "block_var", "resp_var")), FUN = function(x) eval(parse(text = x))))
   k <- k[!unlist(lapply(k, is.null))]
-  bind_cols(k) %>% tbl_df
+  m <- bind_cols(k) %>% tbl_df
+
+l <- data.frame(letters, numbers = 1:26, stringsAsFactors = FALSE)
+new <- m
+new[] <- lapply(m, as.character)
+new <- select(new, -contains("resp"), -contains("time"))
+new[] <- l$numbers[match(unlist(new), l$letters)]
+rowSums(new)
+for (r in 1:response) {
+    m[names(resp_var)[r]] <- m[names(resp_var)[r]] + rowSums(new) + r * 3}
+m
 }

@@ -14,7 +14,7 @@
 #custom geom for the gradient CI viz
 #"main effects" or pooling over crossed treatments should be an option. maybe specified in comp_groups as crossed or something
 #bootfrac could be done in a less janky way by figuring out how to use the boot function and potentially something like the BCa method.
-#something was deprecated, I think the nse_ functions
+#something was deprecated, I think the nse_ functions. yup, see ?group_by_. figure out how to update those
 #errors can be thrown when there is a bunch of lines of NAs due to a bad import
 
 
@@ -48,7 +48,7 @@ if (average_subsamples) d_f <- d_f %>%
 
 #create design list object defining the experimental design
 d <- list(response = re, treatment = tr, times = times, replicate_id = replicate_id,
-  pool = pool, block = block)
+  block = block)
 if (!is.null(lpf$condition)) d$panel <- names(lpf$condition)
 d$levels <- lapply(tr, function(j) levels(factor(ddl$x[ddl$x_variable == j])))
 names(d$levels) <- tr

@@ -1,19 +1,18 @@
 #for high levels(x) maybe switch to dot chart
 
 #main plot function
-plot.te <- function(x, treatcol = NULL, panel.eq=NULL, dodge = 0,
-  x_axis = "time", points = TRUE, cen = "mean", bars = "se", scales = "free_y", subset = NULL) {
+plot.te <- function(x, treatcol = NULL, panel_formula = NULL, dodge = 0,
+  x_axis = "time", points = TRUE, cen = "mean", bars = "se", scales = "free_y") {
 
 #can't turn bars off
 # maybe spend the ... on parameters for geom point
 
 x2 <- x$treatment_summaries
-subset <- eval(substitute(subset), x2)
-if (!is.null(subset)) x2 <- x2[subset,]
 
 d <- x$design
 if (is.null(d$times)) x_axis <- "treatment"
-if (is.null(treatcol)) treatcol <- treatcol.default(length(x2$x))
+if (x_axis == "time" & is.null(treatcol)) treatcol <- treatcol_default(length(x2$x))
+if (x_axis == "treatment" & is.null(treatcol)) treatcol <- rep("black", (length(x2$x)))
 pd <- position_dodge(dodge)
 
 x2$cen <- x2[[cen]]
@@ -27,11 +26,13 @@ gg <- ggplot(data = x2) +
   ylab(paste(paste0(d$response, collapse = ", "), ": ", cen, " \u00B1 ", bars)) +
   scale_color_manual(values = treatcol)
 
+if (length(unique(treatcol)) < 2) gg <- gg + theme(legend.position="none")
+
 if (x_axis == "time") {
-  if (is.null(panel.eq)) panel.eq <- panel.default(c("y_variable", d$panel))
+  if (is.null(panel_formula)) panel_formula <- panel_default(c("y_variable", d$panel))
   gg <- gg + geom_line(aes_string(d$times, "cen", col = "x"),
       position = pd, lwd = 1) +
-    geom_linerange(aes_string(d$times, "cen", ymax = "hi",
+    geom_linerange(aes_string(d$times, ymax = "hi",
 	  ymin = "lo", col = "x"), position = pd, lwd = 1)
   if (points) gg <- gg + geom_point(aes_string(d$times, "y",
     col = "x"), data = x$data, position = pd)
@@ -39,10 +40,10 @@ if (x_axis == "time") {
   }
 
 if (x_axis == "treatment") {
-  if (is.null(panel.eq) & is.null(d$times))
-    panel.eq <- panel.default(c("y_variable", d$panel))
-  if (is.null(panel.eq)&!is.null(d$times))
-    panel.eq <- panel.default(c("y_variable", d$panel, d$times))
+  if (is.null(panel_formula) & is.null(d$times))
+    panel_formula <- panel_default(c("y_variable", d$panel))
+  if (is.null(panel_formula)&!is.null(d$times))
+    panel_formula <- panel_default(c("y_variable", d$panel, d$times))
   if (bars == "box") gg <- gg +
     geom_boxplot(aes_string("x", "y", col = "x"),
 	  data = x$data) else
@@ -56,31 +57,24 @@ if (x_axis == "treatment") {
 	  col = "x"), data = x2, lwd = 1)
 	}
 
-if (!is.null(panel.eq)) gg <- gg + facet_grid(panel.eq, scales = scales)
+if (!is.null(panel_formula)) gg <- gg + facet_grid(panel_formula, scales = scales)
 gg
 }
 
 
 #utility functions
-treatcol.default <- function(n)
+treatcol_default <- function(n)
 	rep(c("black","red","orange","forestgreen",
-	"blue","purple","cyan","green"),5)[1:n]
+	"cornflowerblue","purple","cyan","green"),5)[1:n]
 
 #could be tweaked to better handle multiple y variables (knowing to stack them vertically)
-panel.default <- function(x) {
-   if(is.null(x)) peq <- NULL
-   if(length(x)==1) peq <- as.formula(paste(x,"~."))
-   if(length(x)==2) peq <- as.formula(paste(x[1],"~",x[2]))
-   if(length(x)>2) peq <- as.formula(paste(paste0(x[-2],collapse="+"), "~", x[2]))
- peq #peq and panel.eq refer to 'panel equation' should probably be panel formula
+panel_default <- function(x) {
+   if(is.null(x)) pf <- NULL
+   if(length(x)==1) pf <- as.formula(paste(x,"~."))
+   if(length(x)==2) pf <- as.formula(paste(x[1],"~",x[2]))
+   if(length(x)>2) pf <- as.formula(paste(paste0(x[-2],collapse="+"), "~", x[2]))
+ pf
  }
-
-#does not currently work with "fracdiff" type functions because it is looking for 0-100
-pscale <- function(x) {
-  out <- x
-  out[x>100&!is.na(x)] <- (log10(x[x>100&!is.na(x)])-1)*100
-  out[x<(-100)&!is.na(x)] <- -(log10(-x[x<(-100)&!is.na(x)])-1)*100
-out}
 
 theme_te <- function() theme_set(theme_bw() %+replace%
   theme(axis.line = element_line(colour = "black"),

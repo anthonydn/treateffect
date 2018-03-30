@@ -41,8 +41,9 @@ new <- m
 new[] <- lapply(m, as.character)
 new <- select(new, -contains("resp"), -contains("time"))
 new[] <- l$numbers[match(unlist(new), l$letters)]
-rowSums(new)
+s <- rowSums(new)
+if ("time_var" %in% colnames(m)) s <- s + m$time_var
 for (r in 1:response) {m[names(resp_var)[r]] <-
-  m[names(resp_var)[r]] + rowSums(new) + r * 3}
+  m[names(resp_var)[r]] + s + r * 3}
 m
 }

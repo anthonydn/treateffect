@@ -182,14 +182,16 @@ bootfrac_bca <- function(dfcf, d){
   l <- unique(dfcf$x)
   ratio <- function(d, i) {
     E = d[i,] ; mean(E$y[E$x == l[2]])/mean(E$y[E$x == l[1]])}
-  b <- boot(dfcf, ratio, R = 1000) %>% boot.ci(conf = d$conf.int, type = "bca")
+  b <- boot::boot(dfcf, ratio, R = 1000) %>%
+    boot::boot.ci(conf = d$conf.int, type = "bca")
   data.frame(diff = b$t0, diffmin = b$bca[4], diffmax = b$bca[5])}
 
 bootfrac_bca_paired <- function(dfcf, d) {
   l <- unique(dfcf$x) %>% as.character
   dfcfs <- spread(dfcf[,c(d$block, "y", "x")], x, y)
   ratio <- function(d, i) {E = d[i,] ; mean(E[[l[2]]])/mean(E[[l[1]]])}
-  b <- boot(dfcfs, ratio, R = 1000) %>% boot.ci(conf = d$conf.int, type = "bca")
+  b <- boot::boot(dfcfs, ratio, R = 1000) %>%
+    boot::boot.ci(conf = d$conf.int, type = "bca")
   data.frame(diff = b$t0, diffmin = b$bca[4], diffmax = b$bca[5])}
 
 ##NOT WORKING

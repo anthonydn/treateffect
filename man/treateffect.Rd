@@ -141,8 +141,8 @@ barley.te
 plot(barley.te)
 plotdiff(barley.te)
 
-city_tidy <- boot::city %>%
-  gather(year, population) %>%
+city_tidy <- boot::city \%\>%
+  gather(year, population) \%\>%
   mutate(year = factor(year, labels = c(1920, 1930)), city = rep(1:10, 2))
 treateffect(city_tidy, population ~ year, block = "city",
   comp_function = bootfrac_bca_paired)

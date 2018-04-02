@@ -57,7 +57,7 @@ if (x_axis == "treatment") {
   x2$gs1 <- as.numeric(x2$x) - 0.3
   x2$gs2 <- as.numeric(x2$x) + 0.3
   gg <- gg + geom_segment(aes_string("gs1", "cen", yend = "cen", xend = "gs2",
-	  col = "x"), data = x2, lwd = 1)
+	  col = "x"), data = x2, lwd = 0.5)
 	}
 
 if (!is.null(panel_formula)) gg <- gg + facet_grid(panel_formula, scales = scales)

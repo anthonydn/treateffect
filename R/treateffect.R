@@ -4,11 +4,11 @@
   #tukey, dunnet etc
   #lme
   #bayesian stuff
-#add a few more exampels of "classic" data set analyses
+#add a few more examples of "classic" data set analyses
 #reporting functions
 #try to cut down on dependencies by grabbing key functions
 #for teaching, learning, tweaking, spit out code for graphs, lme etc
-#bootfrac could be done in a less janky way by figuring out how to use the boot function and potentially something like the BCa method.
+#add parsing ability for : and * in treatments
 #if you have the same treatment names in multiple x variables it can cause errors for comparisons. add a warning
 #work on a logical system for internal object names like d_f, data etc
 
@@ -136,25 +136,25 @@ filter_treat <- function(compx, dg) dg %>%
 
 treatment_comparisons <- function(d_f, d) {
 
-  #comparison matrix
-  g <- c("y_variable", d$panel, d$times)
-  a <- lapply(g, function(x) unique(d_f[[x]]))
-  names(a) <- g
-  a$comparison = names(d$comparisons)
-  cmat <- expand.grid(a[length(a):1])[length(a):1]
+#comparison matrix
+g <- c("y_variable", d$panel, d$times)
+a <- lapply(g, function(x) unique(d_f[[x]]))
+names(a) <- g
+a$comparison = names(d$comparisons)
+cmat <- expand.grid(a[length(a):1])[length(a):1]
 
-  #split
-  fnames <- setdiff(c("y_variable", d$panel, d$times), d$pool.variance)
-  d_f_split_list <- split(d_f, interaction(select(d_f, rev(fnames))))
+#split
+fnames <- setdiff(c("y_variable", d$panel, d$times), d$pool.variance)
+d_f_split_list <- split(d_f, interaction(select(d_f, rev(fnames))))
 
-  #apply and combine
-  treatpool <- any(d$treatment %in% d$pool.variance)
-  if (!treatpool) diffs <- lapply(d_f_split_list, pergroup, d) %>% bind_rows
-  if (any(d$treatment %in% d$pool.variance)) diffs <- NULL #do this next
+#apply and combine
+treatpool <- any(d$treatment %in% d$pool.variance)
+if (!treatpool) diffs <- lapply(d_f_split_list, pergroup, d) %>% bind_rows
+if (any(d$treatment %in% d$pool.variance)) diffs <- NULL #do this next
 
-  #combine comparison matrix with comparison function output
-  bind_cols(cmat, diffs) %>% tbl_df
-  }
+#combine comparison matrix with comparison function output
+bind_cols(cmat, diffs) %>% tbl_df
+}
 
 
 ##SPECIFIC FUNCTIONS FOR DOING COMPARISONS (t-test vs. bootstrap vs. bayes vs. lme etc)
@@ -166,27 +166,35 @@ welchCI <- function(dfcf, d) {
     diffmin = -tt$conf.int[2], diffmax = -tt$conf.int[1],
     row.names = NULL)}
 
+twosamplettest <- function(dfcf, d) {
+  tt <- t.test(y ~ x, dfcf, conf.level = d$conf.int, var.equal = TRUE)
+  data.frame(diff = tt$estimate[2] - tt$estimate[1],
+    diffmin = -tt$conf.int[2], diffmax = -tt$conf.int[1],
+    row.names = NULL)}
+
 pairedttest <- function(dfcf, d) {
   dfcf <- arrange(dfcf, dfcf[[d$block]])
   tt <- t.test(y ~ x, dfcf, conf.level = d$conf.int, paired = TRUE)
   data.frame(diff = -tt$estimate, diffmin = -tt$conf.int[2],
     diffmax = -tt$conf.int[1], row.names = NULL)}
 
+bootfrac_bca <- function(dfcf, d){
+  l <- unique(dfcf$x)
+  ratio <- function(d, i) {
+    E = d[i,] ; mean(E$y[E$x == l[2]])/mean(E$y[E$x == l[1]])}
+  b <- boot(dfcf, ratio, R = 1000) %>% boot.ci(conf = d$conf.int, type = "bca")
+  data.frame(diff = b$t0, diffmin = b$bca[4], diffmax = b$bca[5])}
+
+bootfrac_bca_paired <- function(dfcf, d) {
+  l <- unique(dfcf$x) %>% as.character
+  dfcfs <- spread(dfcf[,c(d$block, "y", "x")], x, y)
+  ratio <- function(d, i) {E = d[i,] ; mean(E[[l[2]]])/mean(E[[l[1]]])}
+  b <- boot(dfcfs, ratio, R = 1000) %>% boot.ci(conf = d$conf.int, type = "bca")
+  data.frame(diff = b$t0, diffmin = b$bca[4], diffmax = b$bca[5])}
 
 ##NOT WORKING
 
 #http://www.sumsar.net/blog/2015/07/easy-bayesian-bootstrap-in-r/
-
-bootfrac <- list(FUN = function(data, conf.int) {
-  l <- levels(data$x)
-  groupA <- data$y[data$x == l[1]] %>% na.omit
-  groupB <- data$y[data$x == l[2]] %>% na.omit
-  con <- attr(Hmisc::smean.cl.boot(groupA, B=2000, reps=TRUE), "reps")
-  trt <- attr(Hmisc::smean.cl.boot(groupB, B=2000, reps=TRUE), "reps")
-  list(fracdiff = mean(groupB)/mean(groupA),
-    lo = quantile(trt/con, (1-conf.int)/2 ,na.rm=T),
-    hi = quantile(trt/con, 1-(1-conf.int)/2 ,na.rm=T))},
-  default_extract = alist(fracdiff = fracdiff, fracdiff_lo = lo, fracdiff_hi = hi))
 
 bootperc <- list(FUN = function(data, conf.int) {
   l <- levels(data$x)

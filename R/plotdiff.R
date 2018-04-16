@@ -25,9 +25,9 @@ if (length(unique(treatcol)) < 2) gg <- gg + theme(legend.position="none")
 if (x_axis == "time") {
   if (is.null(panel.eq)) panel.eq <- panel_default(c("y_variable", d$panel))
   gg <- gg +
-    geom_line(aes_string(d$times, "diff", col = "comparison"),
+    geom_line(aes_string(d$times, "Estimate", col = "comparison"),
 	    position = pd, lwd = 1) +
-    geom_linerange(aes_string(d$times, ymax = "diffmax", ymin = "diffmin",
+    geom_linerange(aes_string(d$times, ymax = "upr", ymin = "lwr",
 	    col = "comparison"), position = pd, lwd = 1) +
     geom_hline(yintercept = c(0), col = "gray")
     }
@@ -37,8 +37,8 @@ if (x_axis == "treatment") {
     panel.eq <- panel_default(c("y_variable", d$panel))
   if (is.null(panel.eq) &! is.null(d$times))
     panel.eq <- panel_default(c("y_variable", d$panel, d$times))
-  gg <- gg + geom_pointrange(aes_string("comparison", "diff",
-    ymax = "diffmax", ymin = "diffmin", col = "comparison"), lwd = 1) +
+  gg <- gg + geom_pointrange(aes_string("comparison", "Estimate",
+    ymax = "upr", ymin = "lwr", col = "comparison"), lwd = 1) +
   geom_hline(yintercept = c(0), col = "gray")
 	}
 

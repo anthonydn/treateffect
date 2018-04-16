@@ -11,6 +11,7 @@
 #add parsing ability for : and * in treatments
 #if you have the same treatment names in multiple x variables it can cause errors for comparisons. add a warning
 #work on a logical system for internal object names like d_f, data etc
+#Estimate, lwr, upr may be the right column names
 
 
 ## TREATEFFECT FUNCTION
@@ -60,7 +61,8 @@ if (any(unlist(lapply(d$levels, function(x) length(x) == 1)))) {
   d$comparisons <-
     lapply(tr, function(x) define_comparisons(comp_groups(d$levels[[x]],
       d$control[[x]]))) %>% unlist(., recursive = FALSE) #a control does not always need to be specified.
-  d$FUN <- function(x, ...) try(d$comp_function(x, ...), silent = TRUE)
+  d$FUN <- function(x, ...) tryCatch(d$comp_function(x, ...), error =
+    function(x) data.frame(Estimate = NA, lwr = NA, upr = NA))
   d$conf.int <- conf.int
   d$pool_variance <- pool_variance
 } else comparisons <- NULL
@@ -86,7 +88,7 @@ print.te <- function(x) {
   cat("Treatment summaries:", "\n")
   try(print(x$treatment_summaries), silent = TRUE)
   if(!is.null(x$design$comparisons)) {
-    cat("\n\n", "Treatment comparisons:", "\n", sep = '')
+    cat("\n\n", "Treatment comparisons: ", x$design$comp_function_name, "\n", sep = '')
     try(print(x$treatment_comparisons), silent = TRUE)}}
 
 
@@ -115,7 +117,7 @@ allcomps <- function(levels, control) #a control does not always need to be spec
 treatment_summaries <- function(data, design)
   data %>%
   group_by_at(c("y_variable", "x_variable", design$panel, design$times, "x")) %>%
-  filter(!is.na(y)) %>%
+  dplyr::filter(!is.na(y)) %>%
   summarise_at("y", c(n = "length", design$summary_functions)) #this possibly doesn't like illegal grouping variable names (ie backticked)
 
 #univariate stats
@@ -132,7 +134,7 @@ pergroup <- function(dg, d) lapply(d$comparisons, filter_treat, dg = dg) %>%
   lapply(d$FUN, d) %>% bind_rows
 
 filter_treat <- function(compx, dg) dg %>%
-  filter(x %in% unlist(compx)) %>% droplevels
+  dplyr::filter(x %in% unlist(compx)) %>% droplevels
 
 treatment_comparisons <- function(d_f, d) {
 
@@ -144,39 +146,43 @@ a$comparison = names(d$comparisons)
 cmat <- expand.grid(a[length(a):1])[length(a):1]
 
 #split
-fnames <- setdiff(c("y_variable", d$panel, d$times), d$pool.variance)
-d_f_split_list <- split(d_f, interaction(select(d_f, rev(fnames))))
+fnames <- setdiff(c("y_variable", d$panel, d$times), d$pool_variance)
+d_f_split_list <- split(d_f, interaction(dplyr::select(d_f, rev(fnames))))
 
 #apply and combine
 treatpool <- any(d$treatment %in% d$pool.variance)
 if (!treatpool) diffs <- lapply(d_f_split_list, pergroup, d) %>% bind_rows
-if (any(d$treatment %in% d$pool.variance)) diffs <- NULL #do this next
+if (any(d$treatment %in% d$pool_variance)) diffs <-
+  lapply(d_f_split_list, d$comp_function, d) %>% bind_rows
 
 #combine comparison matrix with comparison function output
 bind_cols(cmat, diffs) %>% tbl_df
 }
 
 
-##SPECIFIC FUNCTIONS FOR DOING COMPARISONS (t-test vs. bootstrap vs. bayes vs. lme etc)
-#should output dataframe with diff, diffmin, diffmax. if it pools, it can output multiple rows
+##SPECIFIC FUNCTIONS FOR DOING COMPARISONS
+#(t-test vs. bootstrap vs. bayes vs. lme etc)
+#should output dataframe with Estimate, lwr, upr
+#if it pools, it can output multiple rows
 
 welchCI <- function(dfcf, d) {
-  tt <- t.test(y ~ x, dfcf, conf.level = d$conf.int)
-  data.frame(diff = tt$estimate[2] - tt$estimate[1],
-    diffmin = -tt$conf.int[2], diffmax = -tt$conf.int[1],
+  tt <- tryCatch(t.test(y ~ x, dfcf, conf.level = d$conf.int),
+    error = function(x) list(conf.int = c(NA, NA)))
+  data.frame(Estimate = diff(aggregate(y ~ x, dfcf, mean)$y),
+    lwr = -tt$conf.int[2], upr = -tt$conf.int[1],
     row.names = NULL)}
 
 twosamplettest <- function(dfcf, d) {
   tt <- t.test(y ~ x, dfcf, conf.level = d$conf.int, var.equal = TRUE)
-  data.frame(diff = tt$estimate[2] - tt$estimate[1],
-    diffmin = -tt$conf.int[2], diffmax = -tt$conf.int[1],
+  data.frame(Estimate = tt$estimate[2] - tt$estimate[1],
+    lwr = -tt$conf.int[2], upr = -tt$conf.int[1],
     row.names = NULL)}
 
 pairedttest <- function(dfcf, d) {
   dfcf <- arrange(dfcf, dfcf[[d$block]])
   tt <- t.test(y ~ x, dfcf, conf.level = d$conf.int, paired = TRUE)
-  data.frame(diff = -tt$estimate, diffmin = -tt$conf.int[2],
-    diffmax = -tt$conf.int[1], row.names = NULL)}
+  data.frame(Estimate = -tt$estimate, lwr = -tt$conf.int[2],
+    upr = -tt$conf.int[1], row.names = NULL)}
 
 bootfrac_bca <- function(dfcf, d){
   l <- unique(dfcf$x)
@@ -184,7 +190,7 @@ bootfrac_bca <- function(dfcf, d){
     E = d[i,] ; mean(E$y[E$x == l[2]])/mean(E$y[E$x == l[1]])}
   b <- boot::boot(dfcf, ratio, R = 1000) %>%
     boot::boot.ci(conf = d$conf.int, type = "bca")
-  data.frame(diff = b$t0, diffmin = b$bca[4], diffmax = b$bca[5])}
+  data.frame(Estimate = b$t0, lwr = b$bca[4], upr = b$bca[5])}
 
 bootfrac_bca_paired <- function(dfcf, d) {
   l <- unique(dfcf$x) %>% as.character
@@ -192,7 +198,19 @@ bootfrac_bca_paired <- function(dfcf, d) {
   ratio <- function(d, i) {E = d[i,] ; mean(E[[l[2]]])/mean(E[[l[1]]])}
   b <- boot::boot(dfcfs, ratio, R = 1000) %>%
     boot::boot.ci(conf = d$conf.int, type = "bca")
-  data.frame(diff = b$t0, diffmin = b$bca[4], diffmax = b$bca[5])}
+  data.frame(Estimate = b$t0, lwr = b$bca[4], upr = b$bca[5])}
+
+TukeyCI  <- function(dfcf, d)
+  lm(y ~ x, data = dfcf) %>%
+  glht(linfct = mcp(x = "Tukey")) %>%
+  confint %>%
+  `$`(confint) %>%
+  tbl_df
+
+
+
+
+
 
 ##NOT WORKING
 

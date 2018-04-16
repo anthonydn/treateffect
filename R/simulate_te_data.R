@@ -39,7 +39,7 @@ tedatasim <- function(n, na = 0, response = 1, time = 1, groups = 1, levels = 2,
 l <- data.frame(letters, numbers = 1:26, stringsAsFactors = FALSE)
 new <- m
 new[] <- lapply(m, as.character)
-new <- select(new, -contains("resp"), -contains("time"))
+new <- dplyr::select(new, -contains("resp"), -contains("time"))
 new[] <- l$numbers[match(unlist(new), l$letters)]
 s <- rowSums(new)
 if ("time_var" %in% colnames(m)) s <- s + m$time_var

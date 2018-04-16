@@ -23,9 +23,9 @@ gg <- ggplot(data = x2) +
 if (length(unique(treatcol)) < 2) gg <- gg + theme(legend.position="none")
 
 if (x_axis == "time") {
-  if (is.null(panel.eq)) panel.eq <- panel_default(c("y_variable", d$panel))
+  if (is.null(panel.eq)) panel.eq <- panel_default(c("response", d$panel))
   gg <- gg +
-    geom_line(aes_string(d$times, "Estimate", col = "comparison"),
+    geom_line(aes_string(d$times, "effect_size", col = "comparison"),
 	    position = pd, lwd = 1) +
     geom_linerange(aes_string(d$times, ymax = "upr", ymin = "lwr",
 	    col = "comparison"), position = pd, lwd = 1) +
@@ -34,10 +34,10 @@ if (x_axis == "time") {
 
 if (x_axis == "treatment") {
   if (is.null(panel.eq) & is.null(d$times))
-    panel.eq <- panel_default(c("y_variable", d$panel))
+    panel.eq <- panel_default(c("response", d$panel))
   if (is.null(panel.eq) &! is.null(d$times))
-    panel.eq <- panel_default(c("y_variable", d$panel, d$times))
-  gg <- gg + geom_pointrange(aes_string("comparison", "Estimate",
+    panel.eq <- panel_default(c("response", d$panel, d$times))
+  gg <- gg + geom_pointrange(aes_string("comparison", "effect_size",
     ymax = "upr", ymin = "lwr", col = "comparison"), lwd = 1) +
   geom_hline(yintercept = c(0), col = "gray")
 	}

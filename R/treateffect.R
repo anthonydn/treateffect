@@ -11,13 +11,11 @@
 #add parsing ability for : and * in treatments
 #if you have the same treatment names in multiple x variables it can cause errors for comparisons. add a warning
 #work on a logical system for internal object names like d_f, data etc
-#Estimate, lwr, upr may be the right column names
-
 
 ## TREATEFFECT FUNCTION
 treateffect <- function(data, formula, times = NULL, pool_variance = NULL,
   block = NULL, replicate_id = NULL, average_subsamples = FALSE,
-  summary_functions = c("mean", "se", "CI68"), comp_groups = mcc,
+  summary_functions = c("mean", "se", "CI68"), comp_groups = allcomps,
   control = NULL, comp_function = welchCI, conf.int = 0.95) {
 
 ##create a data frame with a standardized form
@@ -26,8 +24,8 @@ re <- unlist(strsplit(lpf$left.name, ' [+] '))
 tr <- unlist(strsplit(lpf$right.name, ' [+] '))
 N = length(lpf$left) / length(tr) / length(re)
 
-ddl <- list(y_variable = rep(re, length(tr), ea = N),
-  x_variable = rep(tr, ea = N * length(re)))
+ddl <- list(response = rep(re, length(tr), ea = N),
+  treatment = rep(tr, ea = N * length(re)))
 if (!is.null(lpf$condition)) ddl <- c(ddl, lapply(lpf$condition, as.factor))
 if (!is.null(times)) ddl[[times]] <- rep(data[[times]], length(re) * length(tr))
 if (!is.null(block)) ddl[[block]] <- rep(data[[block]], length(re) * length(tr))
@@ -46,7 +44,7 @@ if (average_subsamples) d_f <- d_f %>%
 d <- list(response = re, treatment = tr, times = times, replicate_id = replicate_id,
   block = block)
 if (!is.null(lpf$condition)) d$panel <- names(lpf$condition)
-d$levels <- lapply(tr, function(j) levels(factor(ddl$x[ddl$x_variable == j])))
+d$levels <- lapply(tr, function(j) levels(factor(ddl$x[ddl$treatment == j])))
 names(d$levels) <- tr
 if (is.null(control)) d$control <- lapply(d$levels, `[[`, 1) else
   d$control <- control
@@ -62,7 +60,7 @@ if (any(unlist(lapply(d$levels, function(x) length(x) == 1)))) {
     lapply(tr, function(x) define_comparisons(comp_groups(d$levels[[x]],
       d$control[[x]]))) %>% unlist(., recursive = FALSE) #a control does not always need to be specified.
   d$FUN <- function(x, ...) tryCatch(d$comp_function(x, ...), error =
-    function(x) data.frame(Estimate = NA, lwr = NA, upr = NA))
+    function(x) data.frame(effect_size = NA, lwr = NA, upr = NA))
   d$conf.int <- conf.int
   d$pool_variance <- pool_variance
 } else comparisons <- NULL
@@ -116,7 +114,7 @@ allcomps <- function(levels, control) #a control does not always need to be spec
 
 treatment_summaries <- function(data, design)
   data %>%
-  group_by_at(c("y_variable", "x_variable", design$panel, design$times, "x")) %>%
+  group_by_at(c("response", "treatment", design$panel, design$times, "x")) %>%
   dplyr::filter(!is.na(y)) %>%
   summarise_at("y", c(n = "length", design$summary_functions)) #this possibly doesn't like illegal grouping variable names (ie backticked)
 
@@ -139,14 +137,14 @@ filter_treat <- function(compx, dg) dg %>%
 treatment_comparisons <- function(d_f, d) {
 
 #comparison matrix
-g <- c("y_variable", d$panel, d$times)
+g <- c("response", d$panel, d$times)
 a <- lapply(g, function(x) unique(d_f[[x]]))
 names(a) <- g
 a$comparison = names(d$comparisons)
 cmat <- expand.grid(a[length(a):1])[length(a):1]
 
 #split
-fnames <- setdiff(c("y_variable", d$panel, d$times), d$pool_variance)
+fnames <- setdiff(c("response", d$panel, d$times), d$pool_variance)
 d_f_split_list <- split(d_f, interaction(dplyr::select(d_f, rev(fnames))))
 
 #apply and combine
@@ -162,26 +160,26 @@ bind_cols(cmat, diffs) %>% tbl_df
 
 ##SPECIFIC FUNCTIONS FOR DOING COMPARISONS
 #(t-test vs. bootstrap vs. bayes vs. lme etc)
-#should output dataframe with Estimate, lwr, upr
+#should output dataframe with effect_size, lwr, upr
 #if it pools, it can output multiple rows
 
 welchCI <- function(dfcf, d) {
   tt <- tryCatch(t.test(y ~ x, dfcf, conf.level = d$conf.int),
     error = function(x) list(conf.int = c(NA, NA)))
-  data.frame(Estimate = diff(aggregate(y ~ x, dfcf, mean)$y),
+  data.frame(effect_size = diff(aggregate(y ~ x, dfcf, mean)$y),
     lwr = -tt$conf.int[2], upr = -tt$conf.int[1],
     row.names = NULL)}
 
 twosamplettest <- function(dfcf, d) {
   tt <- t.test(y ~ x, dfcf, conf.level = d$conf.int, var.equal = TRUE)
-  data.frame(Estimate = tt$estimate[2] - tt$estimate[1],
+  data.frame(effect_size = tt$effect_size[2] - tt$effect_size[1],
     lwr = -tt$conf.int[2], upr = -tt$conf.int[1],
     row.names = NULL)}
 
 pairedttest <- function(dfcf, d) {
   dfcf <- arrange(dfcf, dfcf[[d$block]])
   tt <- t.test(y ~ x, dfcf, conf.level = d$conf.int, paired = TRUE)
-  data.frame(Estimate = -tt$estimate, lwr = -tt$conf.int[2],
+  data.frame(effect_size = -tt$effect_size, lwr = -tt$conf.int[2],
     upr = -tt$conf.int[1], row.names = NULL)}
 
 bootfrac_bca <- function(dfcf, d){
@@ -190,26 +188,40 @@ bootfrac_bca <- function(dfcf, d){
     E = d[i,] ; mean(E$y[E$x == l[2]])/mean(E$y[E$x == l[1]])}
   b <- boot::boot(dfcf, ratio, R = 1000) %>%
     boot::boot.ci(conf = d$conf.int, type = "bca")
-  data.frame(Estimate = b$t0, lwr = b$bca[4], upr = b$bca[5])}
+  data.frame(effect_size = b$t0, lwr = b$bca[4], upr = b$bca[5])}
 
 bootfrac_bca_paired <- function(dfcf, d) {
   l <- unique(dfcf$x) %>% as.character
-  dfcfs <- spread(dfcf[,c(d$block, "y", "x")], x, y)
+  dfcfs <- tidyr::spread(dfcf[,c(d$block, "y", "x")], x, y)
   ratio <- function(d, i) {E = d[i,] ; mean(E[[l[2]]])/mean(E[[l[1]]])}
   b <- boot::boot(dfcfs, ratio, R = 1000) %>%
     boot::boot.ci(conf = d$conf.int, type = "bca")
-  data.frame(Estimate = b$t0, lwr = b$bca[4], upr = b$bca[5])}
+  data.frame(effect_size = b$t0, lwr = b$bca[4], upr = b$bca[5])}
 
+##I think the next thing I'd like to implement is cohen's d
+#maybe with a welch CI then back transformed to fraction or percent
+#this could be great for reporting a stat people are familiar with
+#as bootstrap may be unknown or perceived as sketchy with low sample size
+
+
+# for this to work, pool_variance has to be set to equal the treatment variable
+# and comp_groups set to allcomps (which should maybe be the default)
 TukeyCI  <- function(dfcf, d)
   lm(y ~ x, data = dfcf) %>%
   glht(linfct = mcp(x = "Tukey")) %>%
-  confint %>%
+  confint(level = d$conf.int) %>%
   `$`(confint) %>%
   tbl_df
 
-
-
-
+#not sure you can change 95% to something else in this one
+BESTHDI <- function(dfcf, d){
+  l <- unique(dfcf$x) %>% as.character
+  dfcf_l <- split(dfcf$y, dfcf$x)
+  m <- summary(BESTmcmc(dfcf_l[[l[1]]],dfcf_l[[l[2]]]))[3,c(1,5,6)]
+  m <- tbl_df(data.frame(as.list(m)))
+  names(m) <- c("effect_size", "lwr", "upr")
+  m
+}
 
 
 ##NOT WORKING

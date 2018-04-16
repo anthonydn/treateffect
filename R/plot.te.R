@@ -32,7 +32,7 @@ gg <- ggplot(data = x2) +
 if (length(unique(treatcol)) < 2) gg <- gg + theme(legend.position="none")
 
 if (x_axis == "time") {
-  if (is.null(panel_formula)) panel_formula <- panel_default(c("y_variable", d$panel))
+  if (is.null(panel_formula)) panel_formula <- panel_default(c("response", d$panel))
   gg <- gg + geom_line(aes_string(d$times, "cen", col = "x"),
       position = pd, lwd = 1) +
     geom_linerange(aes_string(d$times, ymax = "hi",
@@ -44,9 +44,9 @@ if (x_axis == "time") {
 
 if (x_axis == "treatment") {
   if (is.null(panel_formula) & is.null(d$times))
-    panel_formula <- panel_default(c("y_variable", d$panel))
+    panel_formula <- panel_default(c("response", d$panel))
   if (is.null(panel_formula)&!is.null(d$times))
-    panel_formula <- panel_default(c("y_variable", d$panel, d$times))
+    panel_formula <- panel_default(c("response", d$panel, d$times))
   if (bars == "box") gg <- gg +
     geom_boxplot(aes_string("x", "y", col = "x"),
 	  data = x$data) else

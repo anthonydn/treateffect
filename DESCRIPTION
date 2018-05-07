@@ -1,9 +1,9 @@
 Package: treateffect
-Title: Calculates and plots treatment effects from manipulative experiments
-Version: 0.15
+Title: Calculates and plots treatment effect sizes from experiments
+Version: 0.2
 Authors@R: person("Anthony", "Darrouzet-Nardi", email = "anthony@darrouzet-nardi.net",
   role = c("aut", "cre"))
-Description: What the package does (one paragraph)
+Description: This package provides an integrated option to calculate and visualize human-readable effect sizes along with estimates of uncertainty using an expandable array of analytical approaches.
 Depends: tidyverse
 Imports:
     Hmisc,

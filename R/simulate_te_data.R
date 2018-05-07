@@ -1,3 +1,5 @@
+#fix the subsample thing. basically take it out. the rhizotron data are a good one to try this stuff on
+
 tedatasim <- function(n, na = 0, response = 1, time = 1, groups = 1, levels = 2,
   subsample = 1, block = FALSE) {
 

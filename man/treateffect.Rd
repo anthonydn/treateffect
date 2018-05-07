@@ -6,9 +6,9 @@
 Estimate summary statistics and effect size comparisons for each independent set of replicates in a structured experiment. Choice of functions for summary statistics and comparisons are flexible. Inputs use a formula interface and human-understandable variable types such as responses, treatments, time, and block.
 }
 \usage{
-treateffect(data, formula, times = NULL, pool_variance = NULL,
-  block = NULL, replicate_id = NULL, average_subsamples = FALSE,
-  summary_functions = c("mean", "se", "CI68"), comp_groups = mcc,
+treateffect(data, formula, times = NULL, block = NULL,
+  pool_variance = NULL, average_subsamples = FALSE,
+  summary_functions = c("mean", "se", "CI68"), comp_groups = allcomps,
   control = NULL, comp_function = welchCI, conf.int = 0.95)
 }
 \arguments{
@@ -16,19 +16,16 @@ treateffect(data, formula, times = NULL, pool_variance = NULL,
 a data frame
 }
  \item{formula}{
-The formula is specified as \code{y1 + y2 + ... ~ x1 + x2 + ... | g1 + g2 + ...} where \code{y1...ym} are response variables \code{1...m} (should be numeric), \code{x1...xi} are treatment variables \code{1...i} (should be categorical). \code{g1...gm} are grouping variables \code{1...g} (factors or character vectors) by which data will be split before analysis, also appearing on separate panels during graphing. This formula interface is similar to the lattice formula interface and in fact uses the lattice formula parser. On-the-fly transformations and other manipulations can be used.
+The formula is specified as \code{y1 + y2 + ... ~ x1 + x2 + ... | g1 + g2 + ...} where \code{y1...ym} are response variables \code{1...m} (should be numeric), \code{x1...xi} are treatment variables \code{1...i} (should be categorical). \code{g1...gm} are grouping variables \code{1...g} (factors or character vectors) by which data will be split before analysis, also appearing on separate panels during graphing. This formula interface is similar to the lattice formula interface and in fact uses the lattice formula parser. As in lattice, factor interactions can be specified with the : operator as long as the relevant input vectors are factors (not character). The * operator is not implemented but can be specified as a + b + a:b. On-the-fly transformations and other manipulations can also be used.
 }
  \item{times}{
 an optional character string indicating the name of a time variable (which can be numeric or of any of the typical date and time formats). Only one time variable can be specified.
 }
- \item{pool_variance}{
-An optional character vector indicating over which variables to pool the variance. This information can be used by  comp_function functions that pool variance (none are yet implemented, but a comp_function based on lme for example would use this).
-}
  \item{block}{
-an optional character string indicating the names of variables indicating blocking or pairing structure in the sample. This is used by comp_function functions such as pairedttest.
+an optional character string indicating the names of variables indicating blocking or pairing structure in the data. This is used by comp_function functions such as pairedttest.
 }
- \item{replicate_id}{
-an optional character string indicating the names of variables over which subsamples should be averaged. The \code{mean()} function is used for averaging.
+ \item{pool_variance}{
+An optional character vector indicating over which variables to pool the variance. This information can be used by comp_function functions that pool variance such as TukeyCI.
 }
  \item{average_subsamples}{
 a logical argument indicating whether any remaining replicates should be averaged. This can be specified in the case that subsamples exist but no replicate_id variable is specified.
@@ -99,7 +96,7 @@ plotdiff(ex3.te)
 
 # univariate data
 ex4.te <- tedatasim(n = 10, response = 1, levels = 1, time = 1,
-    groups = 1, subsample = 1, block = FALSE) %>%
+    groups = 1, subsample = 1, block = FALSE) \%>\%
   treateffect(resp_var1 ~ pred_var1)
 ex4.te
 plot(ex4.te)
@@ -129,21 +126,42 @@ ex7.te
 plot(ex7.te, panel_formula = group_var1 ~ .)
 
 
-## EXAMPLES WITH CLASSIC DATA SETS
-wb.te <- treateffect(warpbreaks, breaks ~
-  interaction(wool, tension), comp_groups = allcomps)
+## EXAMPLES WITH VARIOUS INTERNAL DATA SETS
+#warpbreaks - a commonly used R data set
+wb.te <- treateffect(warpbreaks, breaks ~ wool:tension, comp_groups = allcomps)
 wb.te
 plot(wb.te)
 plotdiff(wb.te)
 
+#barley - who cares about morris? let's see what the best variety is
 barley.te <- treateffect(lattice::barley, yield ~ variety | year)
 barley.te
 plot(barley.te)
 plotdiff(barley.te)
 
+#city example used in many bootstrapping examples
 city_tidy <- boot::city \%>\%
   gather(year, population) \%>\%
   mutate(year = factor(year, labels = c(1920, 1930)), city = rep(1:10, 2))
 treateffect(city_tidy, population ~ year, block = "city",
   comp_function = bootfrac_bca_paired)
+  
+#pool variance among treatments with Tukey test
+amod <- aov(breaks ~ tension, data = warpbreaks)
+confint(multcomp::glht(amod, linfct = mcp(tension = "Tukey")))$confint
+require(multcomp)
+treateffect(warpbreaks, breaks ~ tension, comp_groups = allcomps,
+  pool_variance = "tension", comp_function = TukeyCI)$treatment_comparisons
+
+#Bayesian BESTmcmc "supersedes the t-test"
+y1 <- c(5.77, 5.33, 4.59, 4.33, 3.66, 4.48)
+y2 <- c(3.88, 3.55, 3.29, 2.59, 2.33, 3.59)
+summary(BESTmcmc(y1,y2))
+data.frame(r = c(y1,y2), t = rep(c("y1","y2"), ea = 6)) \%>\%
+treateffect(r ~ t, comp_function = BESTHDI)
+
+#starwars dataset from tidyr with lots missing and categories with 1 number
+treateffect(starwars, height + mass + birth_year ~ gender) \%>\% plot
+
+
 }

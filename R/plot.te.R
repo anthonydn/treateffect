@@ -1,6 +1,6 @@
 #for high levels(x) maybe switch to dot chart
 #graphical alternative to sig stars - maybe text CIs. I think a new density-based visualization is warranted.
-#custom geom for the gradient CI viz
+#add functionality to check object type on import. It could easily be set up to print an extracted treatment_summaries data frame or similar
 
 
 #main plot function
@@ -10,7 +10,7 @@ plot.te <- function(x, treatcol = NULL, panel_formula = NULL, dodge = 0,
 #can't turn bars off
 # maybe spend the ... on parameters for geom point
 
-x2 <- x$treatment_summaries
+x2 <- x$summaries
 
 d <- x$design
 if (is.null(d$times)) x_axis <- "treatment"
@@ -61,7 +61,7 @@ if (x_axis == "treatment") {
 	}
 
 if (!is.null(panel_formula)) gg <- gg + facet_grid(panel_formula, scales = scales)
-gg
+gg + theme_te()
 }
 
 

@@ -1,20 +1,23 @@
 #things to add:
 
 #expand pool of comp_functions, especially for pooled variance analyses
-  #tukey, dunnet etc
-  #lme
-  #bayesian stuff
-#add a few more examples of "classic" data set analyses
-#reporting functions
+  #dunnet
+  #bootperc
+  #bootdiff
 #try to cut down on dependencies by grabbing key functions
-#for teaching, learning, tweaking, spit out code for graphs, lme etc
-#add parsing ability for : and * in treatments
 #if you have the same treatment names in multiple x variables it can cause errors for comparisons. add a warning
 #work on a logical system for internal object names like d_f, data etc
+#help page for comp_functions
+#help page for plot.te and plotdiff
+#help page for simulate_te_data
+#add a bunch of the datasets the students looked at(go through carefully and make sure they all make sense)
+#it's still worth adding examples of my data which tend to be messier and more complex than included data.
+  #would also be cool to put them in the package if they fit
+#go through that script with the Harrell example and see if it could somehow me included
 
 ## TREATEFFECT FUNCTION
-treateffect <- function(data, formula, times = NULL, pool_variance = NULL,
-  block = NULL, replicate_id = NULL, average_subsamples = FALSE,
+treateffect <- function(data, formula, times = NULL, block = NULL,
+  pool_variance = NULL, average_subsamples = FALSE,
   summary_functions = c("mean", "se", "CI68"), comp_groups = allcomps,
   control = NULL, comp_function = welchCI, conf.int = 0.95) {
 
@@ -29,19 +32,17 @@ ddl <- list(response = rep(re, length(tr), ea = N),
 if (!is.null(lpf$condition)) ddl <- c(ddl, lapply(lpf$condition, as.factor))
 if (!is.null(times)) ddl[[times]] <- rep(data[[times]], length(re) * length(tr))
 if (!is.null(block)) ddl[[block]] <- rep(data[[block]], length(re) * length(tr))
-if (!is.null(replicate_id)) ddl[[replicate_id]] <- rep(data[[replicate_id]],
-  length(re) * length(tr))
 ddl$y <- lpf$left
 ddl$x <- if(!is.factor(lpf$right)) factor(lpf$right) else lpf$right
 d_f <- data.frame(ddl)
 #averaging across subsamples
-if (!is.null(replicate_id)) average_subsamples = TRUE
 if (average_subsamples) d_f <- d_f %>%
   group_by_at(setdiff(names(d_f), c("y"))) %>%
-  summarise(subsamples = n(), y = mean(y, na.rm = T))
+  summarise(subsamples = n(), y = mean(y, na.rm = T)) %>%
+  ungroup
 
 #create design list object defining the experimental design
-d <- list(response = re, treatment = tr, times = times, replicate_id = replicate_id,
+d <- list(response = re, treatment = tr, times = times,
   block = block)
 if (!is.null(lpf$condition)) d$panel <- names(lpf$condition)
 d$levels <- lapply(tr, function(j) levels(factor(ddl$x[ddl$treatment == j])))
@@ -72,10 +73,10 @@ if (any(unlist(lapply(d$levels, function(x) length(x) == 1)))) {
 
 summaries <- treatment_summaries(d_f, d)
 if (!is.null(d$comparisons))
-compare <- treatment_comparisons(d_f, d) else compare <- NULL
+comparisons <- treatment_comparisons(d_f, d) else comparisons <- NULL
 
 output <- list(source_data = data, design = d, data = d_f,
-  treatment_summaries = summaries, treatment_comparisons = compare)
+  summaries = summaries, comparisons = comparisons)
 class(output) <- "te"
 output
 }
@@ -84,13 +85,13 @@ output
 print.te <- function(x) {
   cat(paste("Response variable(s):", x$design$response), "\n\n")
   cat("Treatment summaries:", "\n")
-  try(print(x$treatment_summaries), silent = TRUE)
+  try(print(x$summaries), silent = TRUE)
   if(!is.null(x$design$comparisons)) {
     cat("\n\n", "Treatment comparisons: ", x$design$comp_function_name, "\n", sep = '')
-    try(print(x$treatment_comparisons), silent = TRUE)}}
+    try(print(x$comparisons), silent = TRUE)}}
 
 
-## DEFINING WHICH COMPARISONS TO DO
+# DEFINING WHICH COMPARISONS TO DO
 
 define_comparisons <- function(groups) {
   groupA = groups$groupA
@@ -110,13 +111,15 @@ allcomps <- function(levels, control) #a control does not always need to be spec
        groupB = combn(levels, 2)[2,])
 
 
-#TREATMENT SUMMARIES
+# TREATMENT SUMMARIES
 
-treatment_summaries <- function(data, design)
-  data %>%
-  group_by_at(c("response", "treatment", design$panel, design$times, "x")) %>%
+treatment_summaries <- function(d_f, d)
+  d_f %>%
+  mutate(response = ordered(response, d$response)) %>%
+  group_by_at(c("response", "treatment", d$panel, d$times, "x")) %>%
   dplyr::filter(!is.na(y)) %>%
-  summarise_at("y", c(n = "length", design$summary_functions)) #this possibly doesn't like illegal grouping variable names (ie backticked)
+  summarise_at("y", c(n = "length", d$summary_functions)) %>%  #this possibly doesn't like illegal grouping variable names (ie backticked)
+  arrange(response) #should probably implement for grouping vars and treatments (multiple x) too
 
 #univariate stats
 se <- function(x, na.rm = FALSE) sd(x, na.rm = na.rm) / sqrt(length(x))
@@ -126,7 +129,7 @@ cv <- function(x, na.rm = FALSE) {sd(x, na.rm = na.rm) / mean(x, na.rm = na.rm)}
 CI68 <- function(x) CI(x, p = 0.68)
 
 
-#TREATMENT COMPARISONS
+# TREATMENT COMPARISONS
 
 pergroup <- function(dg, d) lapply(d$comparisons, filter_treat, dg = dg) %>%
   lapply(d$FUN, d) %>% bind_rows
@@ -138,14 +141,16 @@ treatment_comparisons <- function(d_f, d) {
 
 #comparison matrix
 g <- c("response", d$panel, d$times)
-a <- lapply(g, function(x) unique(d_f[[x]]))
-names(a) <- g
-a$comparison = names(d$comparisons)
-cmat <- expand.grid(a[length(a):1])[length(a):1]
+cmat <- unique(d_f[g])
+h <- names(d$comparisons)
+cmat <- data.frame(cmat[rep(row.names(cmat),
+  ea = length(h)), ,drop = FALSE], comparison = h)
 
 #split
-fnames <- setdiff(c("response", d$panel, d$times), d$pool_variance)
-d_f_split_list <- split(d_f, interaction(dplyr::select(d_f, rev(fnames))))
+fnames <- setdiff(g, d$pool_variance)
+ffac <- tidyr::unite(dplyr::select(d_f, rev(fnames)))[[1]]
+ffac <- factor(ffac, levels = unique(ffac))
+d_f_split_list <- split(d_f, ffac)
 
 #apply and combine
 treatpool <- any(d$treatment %in% d$pool.variance)
@@ -156,96 +161,3 @@ if (any(d$treatment %in% d$pool_variance)) diffs <-
 #combine comparison matrix with comparison function output
 bind_cols(cmat, diffs) %>% tbl_df
 }
-
-
-##SPECIFIC FUNCTIONS FOR DOING COMPARISONS
-#(t-test vs. bootstrap vs. bayes vs. lme etc)
-#should output dataframe with effect_size, lwr, upr
-#if it pools, it can output multiple rows
-
-welchCI <- function(dfcf, d) {
-  tt <- tryCatch(t.test(y ~ x, dfcf, conf.level = d$conf.int),
-    error = function(x) list(conf.int = c(NA, NA)))
-  data.frame(effect_size = diff(aggregate(y ~ x, dfcf, mean)$y),
-    lwr = -tt$conf.int[2], upr = -tt$conf.int[1],
-    row.names = NULL)}
-
-twosamplettest <- function(dfcf, d) {
-  tt <- t.test(y ~ x, dfcf, conf.level = d$conf.int, var.equal = TRUE)
-  data.frame(effect_size = tt$effect_size[2] - tt$effect_size[1],
-    lwr = -tt$conf.int[2], upr = -tt$conf.int[1],
-    row.names = NULL)}
-
-pairedttest <- function(dfcf, d) {
-  dfcf <- arrange(dfcf, dfcf[[d$block]])
-  tt <- t.test(y ~ x, dfcf, conf.level = d$conf.int, paired = TRUE)
-  data.frame(effect_size = -tt$effect_size, lwr = -tt$conf.int[2],
-    upr = -tt$conf.int[1], row.names = NULL)}
-
-bootfrac_bca <- function(dfcf, d){
-  l <- unique(dfcf$x)
-  ratio <- function(d, i) {
-    E = d[i,] ; mean(E$y[E$x == l[2]])/mean(E$y[E$x == l[1]])}
-  b <- boot::boot(dfcf, ratio, R = 1000) %>%
-    boot::boot.ci(conf = d$conf.int, type = "bca")
-  data.frame(effect_size = b$t0, lwr = b$bca[4], upr = b$bca[5])}
-
-bootfrac_bca_paired <- function(dfcf, d) {
-  l <- unique(dfcf$x) %>% as.character
-  dfcfs <- tidyr::spread(dfcf[,c(d$block, "y", "x")], x, y)
-  ratio <- function(d, i) {E = d[i,] ; mean(E[[l[2]]])/mean(E[[l[1]]])}
-  b <- boot::boot(dfcfs, ratio, R = 1000) %>%
-    boot::boot.ci(conf = d$conf.int, type = "bca")
-  data.frame(effect_size = b$t0, lwr = b$bca[4], upr = b$bca[5])}
-
-##I think the next thing I'd like to implement is cohen's d
-#maybe with a welch CI then back transformed to fraction or percent
-#this could be great for reporting a stat people are familiar with
-#as bootstrap may be unknown or perceived as sketchy with low sample size
-
-
-# for this to work, pool_variance has to be set to equal the treatment variable
-# and comp_groups set to allcomps (which should maybe be the default)
-TukeyCI  <- function(dfcf, d)
-  lm(y ~ x, data = dfcf) %>%
-  glht(linfct = mcp(x = "Tukey")) %>%
-  confint(level = d$conf.int) %>%
-  `$`(confint) %>%
-  tbl_df
-
-#not sure you can change 95% to something else in this one
-BESTHDI <- function(dfcf, d){
-  l <- unique(dfcf$x) %>% as.character
-  dfcf_l <- split(dfcf$y, dfcf$x)
-  m <- summary(BESTmcmc(dfcf_l[[l[1]]],dfcf_l[[l[2]]]))[3,c(1,5,6)]
-  m <- tbl_df(data.frame(as.list(m)))
-  names(m) <- c("effect_size", "lwr", "upr")
-  m
-}
-
-
-##NOT WORKING
-
-#http://www.sumsar.net/blog/2015/07/easy-bayesian-bootstrap-in-r/
-
-bootperc <- list(FUN = function(data, conf.int) {
-  l <- levels(data$x)
-  groupA <- data$y[data$x == l[1]] %>% na.omit
-  groupB <- data$y[data$x == l[2]] %>% na.omit
-  con <- attr(Hmisc::smean.cl.boot(groupA, B=2000, reps=TRUE), "reps")
-  trt <- attr(Hmisc::smean.cl.boot(groupB, B=2000, reps=TRUE), "reps")
-  list(percdiff = (mean(groupB) - mean(groupA)) / mean(groupA) * 100,
-       lo = quantile((trt - con)/con * 100, (1-conf.int)/2 ,na.rm=T),
-       hi = quantile((trt - con)/con * 100, 1-(1-conf.int)/2 ,na.rm=T))},
-  default_extract = alist(percdiff = percdiff, percdiff_lo = lo, percdiff_hi = hi))
-
-bootdiff <- list(FUN = function(data, conf.int) {
-  l <- levels(data$x)
-  groupA <- data$y[data$x == l[1]] %>% na.omit
-  groupB <- data$y[data$x == l[2]] %>% na.omit
-  con <- attr(Hmisc::smean.cl.boot(groupA, B=2000, reps=TRUE), "reps")
-  trt <- attr(Hmisc::smean.cl.boot(groupB, B=2000, reps=TRUE), "reps")
-  list(bootdiff = mean(groupB) - mean(groupA),
-    lo = quantile(trt - con, (1 - conf.int) / 2 , na.rm = T),
-    hi = quantile(trt - con, 1 - (1 - conf.int) / 2 , na.rm = T))},
-  default_extract = alist(meandiff = bootdiff, bootdiff_lo = lo, bootdiff_hi = hi))

@@ -1,13 +1,12 @@
 #make colors repeat
-#implement that sweet Tufte graphics package
 
 #######plotting differences
 plotdiff <- function(x, treatcol = NULL, panel.eq = NULL, dodge = 0,
-  x_axis = "time", pscale = FALSE, scales = "free_y") {
+  x_axis = "time", scales = "free_y") {
 
 d <- x$design
 if (is.null(d$times)) x_axis <- "treatment"
-x2 <- x$treatment_comparisons
+x2 <- x$comparisons
 
 if (x_axis == "time" & is.null(treatcol)) treatcol <- treatcol_default(length(d$comparisons)+1)[-1]
 if (x_axis == "treatment" & is.null(treatcol)) treatcol <- rep("black", (length(d$comparisons)))
@@ -43,5 +42,5 @@ if (x_axis == "treatment") {
 	}
 
 if (!is.null(panel.eq)) gg <- gg + facet_grid(panel.eq, scales = scales)
-gg
+gg + theme_te()
 }

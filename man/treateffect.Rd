@@ -1,7 +1,7 @@
 \name{treateffect}
 \alias{treateffect-package}
 \alias{treateffect}
-\title{Quantify treatment effect sizes in structured experiments}
+\title{Quantify treatment effect sizes in experiments}
 \description{
 Estimate summary statistics and effect size comparisons for each independent set of replicates in a structured experiment. Choice of functions for summary statistics and comparisons are flexible. Inputs use a formula interface and human-understandable variable types such as responses, treatments, time, and block.
 }
@@ -45,7 +45,7 @@ a logical argument indicating whether any remaining replicates should be average
 a character vector including the name of one or multiple functions to be used to summarize each treatment at each time point within each group. Functions \code{se} and \code{CI68} are included. Others such as \code{SD} or custom functions can be used too.
 }
  \item{comp_groups}{
-a function that will be used to set up specific comparisons to be made. The three currently available functions are \code{mcc}, \code{allcomps}, and \code{allothers} specifying multiple comparisons with the control (the control group defined by the control argument), all pairwise comparisons, or comparisons of each treatment vs. all others combined, respectively. The \code{allothers} option currently works only with comp_function (see below) that pool the variance. Viewing the \code{mcc} and \code{allcomps} functions will show how a set of custom comparisons could be defined. If none is specified \code{comp_function_selector} will select one based on which types of variables have been supplied, e.g., if a blocking variable is defined, it will select a function that appropriately pairs responses.
+a function that will be used to set up specific comparisons to be made. The three currently available functions are \code{mcc}, \code{allpairwise}, and \code{allothers} specifying multiple comparisons with the control (the control group defined by the control argument), all pairwise comparisons, or comparisons of each treatment vs. all others combined, respectively. The \code{allothers} option currently works only with comp_function (see below) that pool the variance. Viewing the \code{mcc} and \code{allpairwise} functions will show how a set of custom comparisons could be defined. If none is specified \code{comp_function_selector} will select one based on which types of variables have been supplied, e.g., if a blocking variable is defined, it will select a function that appropriately pairs responses.
 }
  \item{control}{
 an optional character vector the length of the number of specified treatement variables) indicating which treatment level(s) is/are the "control" for each treatment variable if comparisons with the control are desired. If nothing is specified, the first level in each treatment vector is used. Create an ordered variable or specify a control to change which level will be used as the control.
@@ -55,13 +55,14 @@ a function that will be used to make comparisons. See \code{comp_function_select
 }
  \item{conf.int}{
 The alpha level for confidence interval calculations.
-CI_derivation = "ML", effect_size_type = "difference"}
+CI_derivation = "ML", effect_size_type = "difference"
 }
  \item{CI_derivation}{
 character vector that will be used by \code{comp_function_selector} to specify how confidence intervals will be calculated. Current options include "ML" for maximum likelihood methods, "bootstrap" for bootstrap methods, and "bayesian" for Bayesian approaches. ML has the most methods implemented and is the default. It allows pooling of variance, ratios or differences, and paired or unpaired designs. However, complex error nestings and such are not currently implmented. Bootstrap approaches can currently do paired/unpaired and ratios or differences, though the current options implemented are not recommended for small samples. The only Bayesian option is simple unpaired t-test for all specified comparisons.
 }
  \item{effect_size_type}{
-chacter vector specifying how an effect size be reported. The two options are: "difference" (the default) and  "ratio" Keep in mind that ratios often do not make sense for data that contain 0 or negative values.}
+chacter vector specifying how an effect size be reported. The two options are: "difference" (the default) and  "ratio" Keep in mind that ratios often do not make sense for data that contain 0 or negative values.
+}
 }
 
 \details{

@@ -1,5 +1,3 @@
-#make colors repeat
-
 #######plotting differences
 plotdiff <- function(x, treatcol = NULL, panel.eq = NULL, dodge = 0,
   x_axis = "time", scales = "free_y") {
@@ -40,7 +38,7 @@ if (x_axis == "treatment") {
     ymax = "upr", ymin = "lwr", col = "comparison"), lwd = 1) +
   geom_hline(yintercept = c(0), col = "gray")
 	}
-
 if (!is.null(panel.eq)) gg <- gg + facet_grid(panel.eq, scales = scales)
-gg + theme_te()
+if ((x_axis == "treatment") & dim(x2)[1] > 8) gg <- gg + coord_flip()
+gg
 }

@@ -6,10 +6,12 @@
 Estimate summary statistics and effect size comparisons for each independent set of replicates in a structured experiment. Choice of functions for summary statistics and comparisons are flexible. Inputs use a formula interface and human-understandable variable types such as responses, treatments, time, and block.
 }
 \usage{
-treateffect(data, formula, times = NULL, block = NULL,
+treateffect(data, formula = NULL,
+  response = NULL, treatment = NULL, groups = NULL, times = NULL, block = NULL,
   pool_variance = NULL, average_subsamples = FALSE,
-  summary_functions = c("mean", "se", "CI68"), comp_groups = allcomps,
-  control = NULL, comp_function = welchCI, conf.int = 0.95)
+  summary_functions = c("mean", "se", "CI68"), comp_groups = allpairwise,
+  control = NULL, comp_function = NULL, conf.int = 0.95,
+  CI_derivation = "ML", effect_size_type = "difference")
 }
 \arguments{
  \item{data}{
@@ -18,6 +20,15 @@ a data frame
  \item{formula}{
 The formula is specified as \code{y1 + y2 + ... ~ x1 + x2 + ... | g1 + g2 + ...} where \code{y1...ym} are response variables \code{1...m} (should be numeric), \code{x1...xi} are treatment variables \code{1...i} (should be categorical). \code{g1...gm} are grouping variables \code{1...g} (factors or character vectors) by which data will be split before analysis, also appearing on separate panels during graphing. This formula interface is similar to the lattice formula interface and in fact uses the lattice formula parser. As in lattice, factor interactions can be specified with the : operator as long as the relevant input vectors are factors (not character). The * operator is not implemented but can be specified as a + b + a:b. On-the-fly transformations and other manipulations can also be used.
 }
+ \item{response}{
+If a formula is not specified, the response variables y1 + y2 + ... can be specified as a character vector.
+}
+ \item{treatment}{
+If a formula is not specified, the treatment variables x1 + x2 + ... can be specified as a character vector.
+}
+ \item{groups}{
+If a formula is not specified, the response variables g1 + g2 + ... can be specified as a character vector.
+}
  \item{times}{
 an optional character string indicating the name of a time variable (which can be numeric or of any of the typical date and time formats). Only one time variable can be specified.
 }
@@ -25,26 +36,32 @@ an optional character string indicating the name of a time variable (which can b
 an optional character string indicating the names of variables indicating blocking or pairing structure in the data. This is used by comp_function functions such as pairedttest.
 }
  \item{pool_variance}{
-An optional character vector indicating over which variables to pool the variance. This information can be used by comp_function functions that pool variance such as TukeyCI.
+An optional character vector indicating over which variables to pool the variance. This information can be used by comp_function functions that pool variance such as multcompCI.
 }
  \item{average_subsamples}{
-a logical argument indicating whether any remaining replicates should be averaged. This can be specified in the case that subsamples exist but no replicate_id variable is specified.
+a logical argument indicating whether any remaining replicates should be averaged.
 }
  \item{summary_functions}{
 a character vector including the name of one or multiple functions to be used to summarize each treatment at each time point within each group. Functions \code{se} and \code{CI68} are included. Others such as \code{SD} or custom functions can be used too.
 }
  \item{comp_groups}{
-a function that will be used to set up specific comparisons to be made. The two currently available functions are \code{mcc} and \code{allcomps}, specifying multiple comparisons with the control (the control group defined by the control argument) or all pairwise comparisons, respectively. Viewing the \code{mcc} and \code{allcomps} functions will show how a set of custom comparisons could be defined.
+a function that will be used to set up specific comparisons to be made. The three currently available functions are \code{mcc}, \code{allcomps}, and \code{allothers} specifying multiple comparisons with the control (the control group defined by the control argument), all pairwise comparisons, or comparisons of each treatment vs. all others combined, respectively. The \code{allothers} option currently works only with comp_function (see below) that pool the variance. Viewing the \code{mcc} and \code{allcomps} functions will show how a set of custom comparisons could be defined. If none is specified \code{comp_function_selector} will select one based on which types of variables have been supplied, e.g., if a blocking variable is defined, it will select a function that appropriately pairs responses.
 }
  \item{control}{
-an optional character string indicating which treatment level(s) is/are the "control" for each treatment variable if comparisons with the control are desired. Comparisons of each treatment using the \code{mcc()} function are the default. If nothing is specified, the first level in the treatment vector (preferably an ordered factor) is used.
+an optional character vector the length of the number of specified treatement variables) indicating which treatment level(s) is/are the "control" for each treatment variable if comparisons with the control are desired. If nothing is specified, the first level in each treatment vector is used. Create an ordered variable or specify a control to change which level will be used as the control.
 }
  \item{comp_function}{
-a function that will be used to make comparisons. Currently available options include \code{welchCI} for confidence intervals generated with a Welch t-test around the subtractive difference treatment - control; \code{bootdiff} for a bootstrapped confidence interval around the subtractive difference treatment - control; \code{bootfrac} for the treatment/control quotient with a bootstrapped confidence interval; and \code{bootperc} for a "percent difference," (treatment - control) / control * 100 with a bootstrap confidence interval. Custom functions can be defined and more are planned to be added. Ultimately, more complex analyses including approaches such as mixed models could be added.
+a function that will be used to make comparisons. See \code{comp_function_selector} for current options (note: this help file does not yet exist!). If none is specified \code{comp_function_selector} will select one for you.
 }
  \item{conf.int}{
 The alpha level for confidence interval calculations.
+CI_derivation = "ML", effect_size_type = "difference"}
 }
+ \item{CI_derivation}{
+character vector that will be used by \code{comp_function_selector} to specify how confidence intervals will be calculated. Current options include "ML" for maximum likelihood methods, "bootstrap" for bootstrap methods, and "bayesian" for Bayesian approaches. ML has the most methods implemented and is the default. It allows pooling of variance, ratios or differences, and paired or unpaired designs. However, complex error nestings and such are not currently implmented. Bootstrap approaches can currently do paired/unpaired and ratios or differences, though the current options implemented are not recommended for small samples. The only Bayesian option is simple unpaired t-test for all specified comparisons.
+}
+ \item{effect_size_type}{
+chacter vector specifying how an effect size be reported. The two options are: "difference" (the default) and  "ratio" Keep in mind that ratios often do not make sense for data that contain 0 or negative values.}
 }
 
 \details{
@@ -128,13 +145,15 @@ plot(ex7.te, panel_formula = group_var1 ~ .)
 
 ## EXAMPLES WITH VARIOUS INTERNAL DATA SETS
 #warpbreaks - a commonly used R data set
-wb.te <- treateffect(warpbreaks, breaks ~ wool:tension, comp_groups = allcomps)
+wb.te <- treateffect(warpbreaks, breaks ~ wool:tension)
 wb.te
 plot(wb.te)
 plotdiff(wb.te)
 
-#barley - who cares about morris? let's see what the best variety is
-barley.te <- treateffect(lattice::barley, yield ~ variety | year)
+#barley (using comparisons with all other treatments)
+barley.te <- lattice::barley \%>\%
+treateffect(yield ~ variety | year, pool_variance = "variety",
+  comp_groups = allothers)
 barley.te
 plot(barley.te)
 plotdiff(barley.te)
@@ -144,14 +163,21 @@ city_tidy <- boot::city \%>\%
   gather(year, population) \%>\%
   mutate(year = factor(year, labels = c(1920, 1930)), city = rep(1:10, 2))
 treateffect(city_tidy, population ~ year, block = "city",
-  comp_function = bootfrac_bca_paired)
-  
+  comp_function = bootRR_bca_paired)
+
 #pool variance among treatments with Tukey test
 amod <- aov(breaks ~ tension, data = warpbreaks)
 confint(multcomp::glht(amod, linfct = mcp(tension = "Tukey")))$confint
-require(multcomp)
-treateffect(warpbreaks, breaks ~ tension, comp_groups = allcomps,
-  pool_variance = "tension", comp_function = TukeyCI)$treatment_comparisons
+treateffect(warpbreaks, breaks ~ tension, pool_variance = "tension")
+
+#Dunnett multiple comparisons with control example
+amod <- aov(breaks ~ tension, data = warpbreaks)
+confint(multcomp::glht(amod, linfct = mcp(tension = "Dunnett")))$confint
+treateffect(warpbreaks, breaks ~ tension, comp_groups = mcc,
+  pool_variance = "tension")
+#specify a different control
+treateffect(warpbreaks, breaks ~ tension, comp_groups = mcc,
+  pool_variance = "tension", control = "H")
 
 #Bayesian BESTmcmc "supersedes the t-test"
 y1 <- c(5.77, 5.33, 4.59, 4.33, 3.66, 4.48)
@@ -162,6 +188,4 @@ treateffect(r ~ t, comp_function = BESTHDI)
 
 #starwars dataset from tidyr with lots missing and categories with 1 number
 treateffect(starwars, height + mass + birth_year ~ gender) \%>\% plot
-
-
 }

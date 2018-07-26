@@ -1,14 +1,6 @@
-#for high levels(x) maybe switch to dot chart
-#graphical alternative to sig stars - maybe text CIs. I think a new density-based visualization is warranted.
-#add functionality to check object type on import. It could easily be set up to print an extracted treatment_summaries data frame or similar
-
-
 #main plot function
 plot.te <- function(x, treatcol = NULL, panel_formula = NULL, dodge = 0,
   x_axis = "time", points = TRUE, cen = "mean", bars = "se", scales = "free_y") {
-
-#can't turn bars off
-# maybe spend the ... on parameters for geom point
 
 x2 <- x$summaries
 
@@ -61,7 +53,8 @@ if (x_axis == "treatment") {
 	}
 
 if (!is.null(panel_formula)) gg <- gg + facet_grid(panel_formula, scales = scales)
-gg + theme_te()
+if ((x_axis == "treatment") & dim(x2)[1] > 8) gg <- gg + coord_flip()
+gg
 }
 
 

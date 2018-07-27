@@ -19,6 +19,8 @@ a data frame
 }
  \item{formula}{
 The formula is specified as \code{y1 + y2 + ... ~ x1 + x2 + ... | g1 + g2 + ...} where \code{y1...ym} are response variables \code{1...m} (should be numeric), \code{x1...xi} are treatment variables \code{1...i} (should be categorical). \code{g1...gm} are grouping variables \code{1...g} (factors or character vectors) by which data will be split before analysis, also appearing on separate panels during graphing. This formula interface is similar to the lattice formula interface and in fact uses the lattice formula parser. As in lattice, factor interactions can be specified with the : operator as long as the relevant input vectors are factors (not character). The * operator is not implemented but can be specified as a + b + a:b. On-the-fly transformations and other manipulations can also be used.
+
+Using a double underscore, treatments or groups can be tagged for variance pooling as \code{xi__pool} or \code{gi__pool}. Groups can additionally be tagged as time or blocking variables as \code{gi__time} or \code{gi__block}.
 }
  \item{response}{
 If a formula is not specified, the response variables y1 + y2 + ... can be specified as a character vector.
@@ -33,10 +35,10 @@ If a formula is not specified, the response variables g1 + g2 + ... can be speci
 an optional character string indicating the name of a time variable (which can be numeric or of any of the typical date and time formats). Only one time variable can be specified.
 }
  \item{block}{
-an optional character string indicating the names of variables indicating blocking or pairing structure in the data. This is used by comp_function functions such as pairedttest.
+an optional character string indicating the names of variables indicating blocking or pairing structure in the data. This is used by \code{comp_function} functions such as \code{pairedttest}.
 }
  \item{pool_variance}{
-An optional character vector indicating over which variables to pool the variance. This information can be used by comp_function functions that pool variance such as multcompCI.
+An optional character vector indicating over which variables to pool the variance. This information can be used by comp_function functions that pool variance such as \code{multcompCI}.
 }
  \item{average_subsamples}{
 a logical argument indicating whether any remaining replicates should be averaged.
@@ -45,7 +47,7 @@ a logical argument indicating whether any remaining replicates should be average
 a character vector including the name of one or multiple functions to be used to summarize each treatment at each time point within each group. Functions \code{se} and \code{CI68} are included. Others such as \code{SD} or custom functions can be used too.
 }
  \item{comp_groups}{
-a function that will be used to set up specific comparisons to be made. The three currently available functions are \code{mcc}, \code{allpairwise}, and \code{allothers} specifying multiple comparisons with the control (the control group defined by the control argument), all pairwise comparisons, or comparisons of each treatment vs. all others combined, respectively. The \code{allothers} option currently works only with comp_function (see below) that pool the variance. Viewing the \code{mcc} and \code{allpairwise} functions will show how a set of custom comparisons could be defined. If none is specified \code{comp_function_selector} will select one based on which types of variables have been supplied, e.g., if a blocking variable is defined, it will select a function that appropriately pairs responses.
+a function that will be used to set up specific comparisons to be made. The three currently available functions are \code{mcc}, \code{allpairwise}, and \code{allothers} specifying multiple comparisons with the control (the control group defined by the control argument), all pairwise comparisons, or comparisons of each treatment vs. all others combined, respectively. The \code{allothers} option currently works only with comp_functions that pool the variance. Viewing the \code{mcc} and \code{allpairwise} functions will show how a set of custom comparisons could be defined. If none is specified \code{comp_function_selector} will select one based on which types of variables have been supplied, e.g., if a blocking variable is defined, it will select a function that appropriately pairs responses.
 }
  \item{control}{
 an optional character vector the length of the number of specified treatement variables) indicating which treatment level(s) is/are the "control" for each treatment variable if comparisons with the control are desired. If nothing is specified, the first level in each treatment vector is used. Create an ordered variable or specify a control to change which level will be used as the control.
@@ -124,14 +126,14 @@ plot(ex4.te)
 # One treatment over time
 ex5 <- tedatasim(n = 5, response = 1, levels = 1, time = 3,
   groups = 1, subsample = 1, block = FALSE)
-ex5.te <- treateffect(ex5, resp_var1 ~ pred_var1, times = "time_var")
+ex5.te <- treateffect(ex5, resp_var1 ~ pred_var1 | time_var__time)
 ex5.te
 plot(ex5.te)
 
 # Two treatments over time
 ex6 <- tedatasim(n = 5, response = 1, levels = 2, time = 10,
   groups = 1, subsample = 1, block = FALSE)
-ex6.te <- treateffect(ex6, resp_var1 ~ pred_var1, times = "time_var")
+ex6.te <- treateffect(ex6, resp_var1 ~ pred_var1 | time_var__time)
 ex6.te
 plot(ex6.te, dodge = 0.3)
 plotdiff(ex6.te, dodge = 0.3)
@@ -139,7 +141,7 @@ plotdiff(ex6.te, dodge = 0.3)
 # 3 groups, + time
 ex7 <- tedatasim(n = 10, response = 1, levels = 2, time = 30,
   groups = 3, subsample = 1, block = FALSE)
-ex7.te <- treateffect(ex7, resp_var1 ~ pred_var1 | group_var1, times = "time_var")
+ex7.te <- treateffect(ex7, resp_var1 ~ pred_var1 | group_var1 + time_var__time)
 ex7.te
 plot(ex7.te, panel_formula = group_var1 ~ .)
 
@@ -153,8 +155,7 @@ plotdiff(wb.te)
 
 #barley (using comparisons with all other treatments)
 barley.te <- lattice::barley \%>\%
-treateffect(yield ~ variety | year, pool_variance = "variety",
-  comp_groups = allothers)
+treateffect(yield ~ variety__pool | year, comp_groups = allothers)
 barley.te
 plot(barley.te)
 plotdiff(barley.te)
@@ -163,22 +164,21 @@ plotdiff(barley.te)
 city_tidy <- boot::city \%>\%
   gather(year, population) \%>\%
   mutate(year = factor(year, labels = c(1920, 1930)), city = rep(1:10, 2))
-treateffect(city_tidy, population ~ year, block = "city",
+treateffect(city_tidy, population ~ year + city__block,
   comp_function = bootRR_bca_paired)
 
 #pool variance among treatments with Tukey test
 amod <- aov(breaks ~ tension, data = warpbreaks)
 confint(multcomp::glht(amod, linfct = mcp(tension = "Tukey")))$confint
-treateffect(warpbreaks, breaks ~ tension, pool_variance = "tension")
+treateffect(warpbreaks, breaks ~ tension__pool)
 
 #Dunnett multiple comparisons with control example
 amod <- aov(breaks ~ tension, data = warpbreaks)
 confint(multcomp::glht(amod, linfct = mcp(tension = "Dunnett")))$confint
-treateffect(warpbreaks, breaks ~ tension, comp_groups = mcc,
-  pool_variance = "tension")
+treateffect(warpbreaks, breaks ~ tension__pool, comp_groups = mcc)
 #specify a different control
-treateffect(warpbreaks, breaks ~ tension, comp_groups = mcc,
-  pool_variance = "tension", control = "H")
+treateffect(warpbreaks, breaks ~ tension__pool, comp_groups = mcc,
+  control = "H")
 
 #Bayesian BESTmcmc "supersedes the t-test"
 y1 <- c(5.77, 5.33, 4.59, 4.33, 3.66, 4.48)
@@ -189,4 +189,20 @@ treateffect(r ~ t, comp_function = BESTHDI)
 
 #starwars dataset from tidyr with lots missing and categories with 1 number
 treateffect(starwars, height + mass + birth_year ~ gender) \%>\% plot
+
+#Lots of ways to skin a cat
+treateffect(NSE_7mo, NSE_7mo ~ treatment | year) \%>\% plot
+treateffect(NSE_7mo, NSE_7mo ~ treatment) \%>\% plotdiff
+treateffect(NSE_7mo, NSE_7mo ~ treatment | year) \%>\% plotdiff
+treateffect(NSE_7mo, NSE_7mo ~ treatment | year + block__block) \%>\% plotdiff
+treateffect(NSE_7mo, NSE_7mo ~ treatment__pool | year + block__block) \%>\% plotdiff
+treateffect(NSE_7mo, NSE_7mo ~ treatment__pool | year__pool +
+  block__block) \%>\% plotdiff
+treateffect(NSE_7mo, NSE_7mo ~ treatment__pool | year__pool) \%>\% plotdiff
+treateffect(NSE_7mo, NSE_7mo ~ treatment | year,
+  comp_function = bootdiff_bca) \%>\% plotdiff
+treateffect(NSE_7mo, NSE_7mo ~ treatment | year__time + block__block,
+  comp_groups = mcc) \%>\% plotdiff(dodge = 0.5)
+#this next one gives wrong answers and I should find out why bc someone will try it.
+treateffect(NSE_7mo, NSE_7mo ~ treatment | year__pool + block__block) \%>\% plotdiff
 }

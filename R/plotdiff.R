@@ -39,6 +39,7 @@ if (x_axis == "treatment") {
   geom_hline(yintercept = c(0), col = "gray")
 	}
 if (!is.null(panel.eq)) gg <- gg + facet_grid(panel.eq, scales = scales)
-if ((x_axis == "treatment") & dim(x2)[1] > 8) gg <- gg + coord_flip()
+h <- dim(x2)[1] #/ prod(unlist(lapply(d$panel, function(x) length(levels(x2[[x]])))))
+if ((x_axis == "treatment") & h > 8) gg <- gg + coord_flip()
 gg
 }

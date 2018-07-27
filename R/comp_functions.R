@@ -1,7 +1,7 @@
 ##SPECIFIC FUNCTIONS FOR DOING COMPARISONS
 
 comp_function_selector <- function(comp_function, CI_derivation,
-  effect_size_type, block, pool_variance, tr) {
+  effect_size_type, block, pool_variance, comp_function_name) {
 	x = NULL
   if(CI_derivation == "ML" & effect_size_type == "difference" &
     is.null(block) & is.null(pool_variance))
@@ -41,7 +41,7 @@ comp_function_selector <- function(comp_function, CI_derivation,
 	  x = list(BESTHDI, "BESTHDI")
 
   if(!is.null(comp_function))
-    x = list(comp_function, deparse(substitute(comp_function)))
+    x = list(comp_function, comp_function_name)
 
   if(!is.null(x)) x else stop("Specified comparison approach not implemented")}
 

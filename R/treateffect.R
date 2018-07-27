@@ -12,6 +12,13 @@ if (is.null(formula)) {f <- paste(paste(response, collapse='+'),
 if (!is.null(groups)) f <- paste(f, "|", paste(groups, collapse='+'))
 formula <- as.formula(f)}
 
+#parse te formula
+f <- teParseFormula(formula)
+formula = f$formula
+if (is.null(times)) times <- f$times
+if (is.null(block)) block <- f$block
+if (is.null(pool_variance)) pool_variance <- f$pool_variance
+
 ##create an analysis data frame (d_f) with a standardized form
 lpf <- lattice:::latticeParseFormula(formula, data, multiple = TRUE)
 re <- unlist(strsplit(lpf$left.name, ' [+] '))
@@ -47,7 +54,8 @@ if (is.null(control)) d$control <- lapply(d$levels, `[[`, 1) else
 names(d$control) <- tr
 d$summary_functions <- summary_functions
 F <- comp_function_selector(comp_function, CI_derivation,
-  effect_size_type, block, pool_variance, tr)
+  effect_size_type, block, pool_variance,
+  comp_function_name = deparse(substitute(comp_function)))
 d$comp_function <- F[[1]]
 d$comp_function_name <- F[[2]]
 d$contrasts <- deparse(substitute(comp_groups))
@@ -76,6 +84,28 @@ output <- list(source_data = data, design = d, data = d_f,
   summaries = summaries, comparisons = comparisons)
 class(output) <- "te"
 output
+}
+
+#parse te formulas
+teParseFormula <- function(formula) {
+
+  s1 <- as.character(formula)[3]
+  pool_variance <- str_extract_all(s1, '\\w+__pool') %>%
+    unlist %>% str_replace_all('__pool', '')
+  s2 <- str_replace_all(s1, '__pool', '')
+  if(length(pool_variance) == 0) pool_variance <- NULL
+  times <- str_extract_all(s2, '\\w+__time') %>%
+    unlist %>% str_replace_all('__time', '')
+  s3 <- str_replace_all(s2, ' [\\+\\|] \\w+__time', '')
+  if(length(times) == 0) times <- NULL
+  block <- str_extract_all(s2, '\\w+__block') %>%
+    unlist %>% str_replace_all('__block', '')
+  s4 <- str_replace_all(s3, ' [\\+\\|] \\w+__block', '')
+  if(length(block) == 0) block <- NULL
+
+  f <- as.formula(paste(as.character(formula)[2], "~", s4))
+
+  list(formula = f, pool_variance = pool_variance, times = times, block = block)
 }
 
 #print te objects

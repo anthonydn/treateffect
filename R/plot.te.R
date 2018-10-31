@@ -1,6 +1,7 @@
 #main plot function
 plot.te <- function(x, treatcol = NULL, panel_formula = NULL, dodge = 0,
-  x_axis = "time", points = TRUE, cen = "mean", bars = "se", scales = "free_y") {
+  x_axis = "time", points = TRUE, cen = "mean", bars = "se",
+  scales = "free_y", horizontal = FALSE) {
 
 x2 <- x$summaries
 
@@ -54,7 +55,7 @@ if (x_axis == "treatment") {
 
 if (!is.null(panel_formula)) gg <- gg + facet_grid(panel_formula, scales = scales)
 h <- dim(x2)[1] #/ prod(unlist(lapply(d$panel, function(x) length(levels(x2[[x]])))))
-if ((x_axis == "treatment") & h > 8) gg <- gg + coord_flip()
+if (horizontal) gg <- gg + coord_flip()
 gg
 }
 

@@ -1,6 +1,6 @@
 #######plotting differences
 plotdiff <- function(x, treatcol = NULL, panel.eq = NULL, dodge = 0,
-  x_axis = "time", scales = "free_y") {
+  x_axis = "time", scales = "free_y", horizontal = FALSE) {
 
 d <- x$design
 if (is.null(d$times)) x_axis <- "treatment"
@@ -40,6 +40,6 @@ if (x_axis == "treatment") {
 	}
 if (!is.null(panel.eq)) gg <- gg + facet_grid(panel.eq, scales = scales)
 h <- dim(x2)[1] #/ prod(unlist(lapply(d$panel, function(x) length(levels(x2[[x]])))))
-if ((x_axis == "treatment") & h > 8) gg <- gg + coord_flip()
+if (horizontal) gg <- gg + coord_flip()
 gg
 }

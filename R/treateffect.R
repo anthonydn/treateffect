@@ -188,6 +188,15 @@ if (!any(d$treatment %in% d$pool_variance))
   diffs <- lapply(d_f_split_list, pergroup, d) %>% bind_rows else
   diffs <- lapply(d_f_split_list, d$comp_function, d) %>% bind_rows
 
+#sample sizes
+h <- lapply(d_f_split_list, function(j) summary(j$x))
+iA <- match(unlist(lapply(d$comparisons, function(x) x$groupA)), names(h[[1]]))
+iB <- match(unlist(lapply(d$comparisons, function(x) x$groupB)), names(h[[1]]))
+cmat$left_n <- unlist(lapply(h, function(x) x[iB]))
+cmat$right_n <- unlist(lapply(h, function(x) x[iA]))
+if (!is.null(d$pool_variance) & (d$contrasts %in% c("allpairwise", "mcc")))
+  cmat <- filter(cmat, left_n != 0, right_n != 0)
+
 #combine comparison matrix with comparison function output
 bind_cols(cmat, diffs) %>% tbl_df
 }

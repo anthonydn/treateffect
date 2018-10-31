@@ -69,6 +69,8 @@ pairedttest <- function(dfcf, d) {
 mult_compCI  <- function(dfcf, d) {
 require("emmeans")
 gvars <- setdiff(d$pool_variance, d$treatment)
+if (length(gvars) > 0 & !is.null(d$times))
+  gvars[gvars == d$times] <- paste("factor(", d$times, ")")
 fixed <- as.formula(paste("y ~", paste(c("x", gvars), collapse = "*")))
 if (d$contrasts == "allpairwise") co <- "revpairwise" else
 if (d$contrasts == "mcc") co <- "trt.vs.ctrl"
@@ -87,6 +89,8 @@ mixed_effectsCI  <- function(dfcf, d) {
 require("nlme")
 require("emmeans")
 gvars <- setdiff(d$pool_variance, d$treatment)
+if (length(gvars) > 0 & !is.null(d$times))
+  gvars[gvars == d$times] <- paste("factor(", d$times, ")")
 fixed <- as.formula(paste("y ~", paste(c("x", gvars), collapse = "*")))
 random <- as.formula(paste("~ 1 |", d$block))
 if (d$contrasts == "allpairwise") co <- "revpairwise" else

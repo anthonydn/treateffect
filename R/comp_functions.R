@@ -155,6 +155,7 @@ zhouRR <- function(dfcf,d) {
 
 # Bootstrapping (differences and ratios)
 bootdiff_bca <- function(dfcf, d) {
+  dfcf <- na.omit(dfcf)
   l <- levels(dfcf$x)
   diff <- function(d, i) {
     E = d[i,] ; mean(E$y[E$x == l[2]]) - mean(E$y[E$x == l[1]])}
@@ -163,6 +164,7 @@ bootdiff_bca <- function(dfcf, d) {
   data.frame(effect_size = b$t0, lwr = b$bca[4], upr = b$bca[5])}
 
 bootdiff_bca_paired <- function(dfcf, d) {
+  dfcf <- na.omit(dfcf)
   l <- levels(dfcf$x) %>% as.character
   dfcfs <- tidyr::spread(dfcf[,c(d$block, "y", "x")], x, y)
   ratio <- function(d, i) {E = d[i,] ; mean(E[[l[2]]]) - mean(E[[l[1]]])}
@@ -171,6 +173,7 @@ bootdiff_bca_paired <- function(dfcf, d) {
   data.frame(effect_size = b$t0, lwr = b$bca[4], upr = b$bca[5])}
 
 bootRR_bca <- function(dfcf, d) {
+  dfcf <- na.omit(dfcf)
   l <- levels(dfcf$x)
   ratio <- function(d, i) {
     E = d[i,] ; mean(E$y[E$x == l[2]]) / mean(E$y[E$x == l[1]])}
@@ -179,6 +182,7 @@ bootRR_bca <- function(dfcf, d) {
   data.frame(effect_size = b$t0, lwr = b$bca[4], upr = b$bca[5])}
 
 bootRR_bca_paired <- function(dfcf, d) {
+  dfcf <- na.omit(dfcf)
   l <- levels(dfcf$x) %>% as.character
   dfcfs <- tidyr::spread(dfcf[,c(d$block, "y", "x")], x, y)
   ratio <- function(d, i) {E = d[i,] ; mean(E[[l[2]]]) / mean(E[[l[1]]])}

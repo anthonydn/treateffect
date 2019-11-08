@@ -123,6 +123,7 @@ pairedRR <- function(dfcf, d) {
     upr = exp(tt$conf.int[2]), row.names = NULL)}
 
 ## Ratios for zero-inflated unpaired log-normal data
+#note: it doesn't do NA
 zhouRR <- function(dfcf,d) {
   l <- unique(dfcf$x) %>% as.character
   dfcf_l <- split(dfcf$y, dfcf$x)

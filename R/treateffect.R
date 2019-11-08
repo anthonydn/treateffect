@@ -21,7 +21,7 @@ if (is.null(pool_variance)) pool_variance <- f$pool_variance
 
 ##create an analysis data frame (d_f) with a standardized form
 lpf <- lattice:::latticeParseFormula(formula, data, multiple = TRUE)
-re <- unlist(strsplit(lpf$left.name, ' [+] '))
+re <- unlist(strsplit(lpf$left.name, ' [+] ')) #this causes an error because lattice inserts random spaces in a response variable name for long formulas
 tr <- unlist(strsplit(lpf$right.name, ' [+] '))
 N = length(lpf$left) / length(tr) / length(re)
 if (!is.null(lpf$condition) &
@@ -40,7 +40,7 @@ d_f <- data.frame(ddl)
 #averaging across subsamples
 if (average_subsamples) d_f <- d_f %>%
   group_by_at(setdiff(names(d_f), c("y"))) %>%
-  summarise(subsamples = n(), y = mean(y, na.rm = T)) %>%
+  summarise(subsamples = n(), y = mean(y, na.rm = T)) %>% #this causes a problem because it resports the response variables
   ungroup
 
 #create design list object
@@ -52,7 +52,8 @@ names(d$levels) <- tr
 if (is.null(control)) d$control <- lapply(d$levels, `[[`, 1) else
   d$control <- as.list(control)
 names(d$control) <- tr
-d$summary_functions <- summary_functions
+d$summary_functions <- lapply(summary_functions, get)
+names(d$summary_functions) <- summary_functions
 F <- comp_function_selector(comp_function, CI_derivation,
   effect_size_type, block, pool_variance,
   comp_function_name = deparse(substitute(comp_function)))
@@ -179,7 +180,7 @@ cmat <- data.frame(cmat[rep(row.names(cmat),
 
 #split
 fnames <- setdiff(g, d$pool_variance)
-ffac <- tidyr::unite(d_f[rev(fnames)])[[1]]
+ffac <- tidyr::unite(d_f[rev(fnames)], "ffac")[[1]]
 ffac <- factor(ffac, levels = unique(ffac))
 d_f_split_list <- split(d_f, ffac)
 

@@ -12,10 +12,10 @@ if (x_axis == "treatment" & is.null(treatcol)) treatcol <- rep("black", (length(
 pd <- position_dodge(dodge)
 
 x2$cen <- x2[[cen]]
-if (length(bars) == 1) x2$lo <- x2[[cen]] - x2[[bars]]
-if (length(bars) == 1) x2$hi <- x2[[cen]] + x2[[bars]]
-if (length(bars) == 2) x2$lo <- x2[[bars[1]]]
-if (length(bars) == 2) x2$hi <- x2[[bars[2]]]
+if (length(bars) == 1) x2$lwr <- x2[[cen]] - x2[[bars]]
+if (length(bars) == 1) x2$upr <- x2[[cen]] + x2[[bars]]
+if (length(bars) == 2) x2$lwr <- x2[[bars[1]]]
+if (length(bars) == 2) x2$upr <- x2[[bars[2]]]
 
 gg <- ggplot(data = x2) +
   xlab(d$times) +
@@ -28,8 +28,8 @@ if (x_axis == "time") {
   if (is.null(panel_formula)) panel_formula <- panel_default(c("response", d$panel))
   gg <- gg + geom_line(aes_string(d$times, "cen", col = "x"),
       position = pd, lwd = 1) +
-    geom_linerange(aes_string(d$times, ymax = "hi",
-	  ymin = "lo", col = "x"), position = pd, lwd = 1)
+    geom_linerange(aes_string(d$times, ymax = "upr",
+	  ymin = "lwr", col = "x"), position = pd, lwd = 1)
   if (points) gg <- gg + geom_point(aes_string(d$times, "y",
     col = "x"), data = x$data, position = pd)
 	#add if flag and ribbons
@@ -43,8 +43,8 @@ if (x_axis == "treatment") {
   if (bars == "box") gg <- gg +
     geom_boxplot(aes_string("x", "y", col = "x"),
 	  data = x$data) else
-  gg <- gg + geom_linerange(aes_string("x", ymax = "hi",
-    ymin = "lo", col = "x"), position = pd, lwd = 1)
+  gg <- gg + geom_linerange(aes_string("x", ymax = "upr",
+    ymin = "lwr", col = "x"), position = pd, lwd = 1)
   if (points) gg <- gg + geom_point(aes_string("x", "y",
     col = "x"), data = x$data, position = pd)
   x2$gs1 <- as.numeric(x2$x) - 0.3

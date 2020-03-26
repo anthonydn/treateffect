@@ -62,7 +62,7 @@ twosamplettest <- function(dfcf, d) {
 
 pairedttest <- function(dfcf, d) {
   dfcf <- arrange(dfcf, dfcf[[d$block]])
-  tt <- t.test(y ~ x, dfcf, conf.level = d$conf.int, paired = TRUE)
+  tt <- t.test(y ~ x, dfcf, conf.level = d$conf.int, paired = TRUE, na.action = na.omit)
   data.frame(effect_size = -tt$estimate, lwr = -tt$conf.int[2],
     upr = -tt$conf.int[1], row.names = NULL)}
 
@@ -118,7 +118,7 @@ mratioRR <- function(dfcf, d) {
 
 pairedRR <- function(dfcf, d) {
   dfcf <- arrange(dfcf, dfcf[[d$block]])
-  tt <- t.test(-log(y) ~ x, dfcf, conf.level = d$conf.int, paired = TRUE)
+  tt <- t.test(-log(y) ~ x, dfcf, conf.level = d$conf.int, paired = TRUE, na.action = na.omit)
   data.frame(effect_size = exp(tt$estimate), lwr = exp(tt$conf.int[1]),
     upr = exp(tt$conf.int[2]), row.names = NULL)}
 

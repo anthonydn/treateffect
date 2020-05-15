@@ -82,7 +82,7 @@ lm(fixed, data = dfcf) %>%
   emmeans(contrasts) %>%
   confint %>%
   `$`(contrasts) %>%
-  tbl_df %>%
+  as_tibble %>%
   transmute(effect_size = estimate, lwr = lower.CL, upr = upper.CL)}
 
 mixed_effectsCI  <- function(dfcf, d) {
@@ -103,7 +103,7 @@ lme(fixed, random, data = dfcf) %>%
   emmeans(contrasts) %>%
   confint %>%
   `$`(contrasts) %>%
-  tbl_df %>%
+  as_tibble %>%
   transmute(effect_size = estimate, lwr = lower.CL, upr = upper.CL)}
 
 
@@ -199,6 +199,6 @@ BESTHDI <- function(dfcf, d){
   l <- unique(dfcf$x) %>% as.character
   dfcf_l <- split(dfcf$y, dfcf$x)
   m <- summary(BESTmcmc(dfcf_l[[l[1]]],dfcf_l[[l[2]]]))[3,c(1,5,6)]
-  m <- tbl_df(data.frame(as.list(m)))
+  m <- as_tibble(data.frame(as.list(m)))
   names(m) <- c("effect_size", "lwr", "upr")
   m}

@@ -199,5 +199,5 @@ if (!is.null(d$pool_variance) & (d$contrasts %in% c("allpairwise", "mcc")))
   cmat <- filter(cmat, left_n != 0, right_n != 0)
 
 #combine comparison matrix with comparison function output
-bind_cols(cmat, diffs) %>% tbl_df
+bind_cols(cmat, diffs) %>% as_tibble
 }

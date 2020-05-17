@@ -1,6 +1,6 @@
 Package: treateffect
 Title: Calculates and plots treatment effect sizes from experiments
-Version: 0.3.0
+Version: 0.3.1
 Authors@R: person("Anthony", "Darrouzet-Nardi", email = "anthony@darrouzet-nardi.net",
   role = c("aut", "cre"))
 Description: Calculates and visualizes human-readable effect sizes along with estimates of uncertainty using an expandable array of analytical approaches.

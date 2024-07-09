@@ -7,7 +7,7 @@ x2 <- x$summaries
 
 d <- x$design
 if (is.null(d$times)) x_axis <- "treatment"
-if (x_axis == "time" & is.null(treatcol)) treatcol <- treatcol_default(levels(length(x2$x)))
+if (x_axis == "time" & is.null(treatcol)) treatcol <- treatcol_default(length(levels(x2$x)))
 if (x_axis == "treatment" & is.null(treatcol)) treatcol <- rep("black", (length(levels(x2$x))))
 pd <- position_dodge(dodge)
 
